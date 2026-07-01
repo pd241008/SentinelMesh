@@ -1,106 +1,162 @@
-# Design Document: SentinelMesh
+# SentinelMesh
 
-## 1. Overview and Context
-**SentinelMesh** is a decentralized anomaly correlation framework designed for distributed network intrusion sensing. Modern network defense typically assumes a centralized Security Information and Event Management (SIEM) pipeline. This conventional architecture introduces a single point of failure, a latency bottleneck, and requires sustained bandwidth provisioning proportional to the number of monitored endpoints.
+**Gossip-propagated collective anomaly detection for distributed network intrusion sensing.**
 
-Attackers deliberately exploit this centralized architecture and the per-node thresholding of traditional IDS using *distributed low-and-slow* attacks (e.g., slow-rate distributed port scans, distributed credential-stuffing campaigns). These campaigns generate traffic that appears statistically unremarkable at any single observation point. SentinelMesh addresses this by replacing the centralized aggregator with a lightweight, decentralized **gossip-based correlation** mechanism that operates effectively on resource-constrained infrastructure. 
+SentinelMesh is a decentralized anomaly correlation framework in which independent IDS nodes exchange compact anomaly digests via an epidemic gossip protocol — instead of relying on a centralized SIEM aggregator — to recover detection capability for attacks deliberately fragmented across many targets (slow-rate distributed port scans, low-and-slow credential stuffing, coordinated reconnaissance sweeps) that no single node can see enough of to flag alone.
 
-```mermaid
-graph TD
-    subgraph "SentinelMesh (Decentralized Gossip)"
-    N1((Node 1)) <-->|Constant-Size Digest| N2((Node 2))
-    N2 <-->|Constant-Size Digest| N3((Node 3))
-    N3 <-->|Constant-Size Digest| N1
-    N4((Node 4)) <-->|Constant-Size Digest| N2
-    N1 <-->|Constant-Size Digest| N4
-    end
+This repo contains the reference simulator, an independent ML-based validation harness, and a results dashboard, built to generate the empirical results for the SentinelMesh paper (target venue: GSCon 2027).
 
-    subgraph "Traditional SIEM (Centralized)"
-    E1((Edge 1)) -->|Raw Logs/Flows| Agg[SIEM Aggregator]
-    E2((Edge 2)) -->|Raw Logs/Flows| Agg
-    E3((Edge 3)) -->|Raw Logs/Flows| Agg
-    E4((Edge 4)) -->|Raw Logs/Flows| Agg
-    end
+---
+
+## Status
+
+| Track | Component | Status |
+|---|---|---|
+| Simulator (Go) | `dataset`, `attack` | ✅ done |
+| Simulator (Go) | `scorer` | ✅ done |
+| Simulator (Go) | `node`, `gossip`, `quorum` | 🚧 in progress |
+| Simulator (Go) | `baseline`, `metrics`, `cmd/simulate` | ⬜ not started |
+| ML cross-check (Python) | scorer validation | ⬜ not started |
+| Dashboard (Next.js) | sweep visualization | ⬜ not started |
+
+
+
+
+---
+
+## Why gossip instead of centralized aggregation
+
+A centralized SIEM pipeline has two structural weaknesses this project is designed around:
+
+1. **Single point of failure + latency bottleneck** — logs traverse the network to one aggregator, get parsed, get correlated; that round-trip can exceed the propagation time of a fast-moving attack.
+2. **Bandwidth that scales with N** — sustained log volume proportional to the number of monitored endpoints, often infeasible for campus networks, IoT gateways, or branch offices without a dedicated SecOps budget.
+
+SentinelMesh borrows the constant-fanout, anti-entropy structure that Cassandra, Dynamo, and Serf use for membership/failure detection, and repurposes it for anomaly-score correlation instead.
+
+---
+
+## How it works
+
+1. **Local scoring** — each node `i` computes a local anomaly score `sᵢ(t) ∈ [0,1]` over a sliding window, using a lightweight EWMA z-score deviation scorer (O(1) update, suitable for constrained nodes). Each score is tagged with a coarse category hint `cᵢ(t)` (e.g. `recon`, `dos`) derived from simple heuristics — connection fan-out rate, port-touch diversity.
+2. **Gossip digest exchange** — at fixed intervals, each node builds a constant-size digest `Dᵢ(t) = ⟨node_id, sᵢ(t), cᵢ(t), t⟩` and pushes it to `f` randomly selected peers. Receivers merge into a local digest cache, keyed by source node, within a sliding correlation window `W`.
+3. **Quorum escalation** — a node escalates a collective alert for category `c` if, within its own digest cache restricted to window `W`, the number of distinct nodes reporting an elevated score for `c` meets or exceeds quorum threshold `q`. No node needs direct contact with every contributor — signal reaches it transitively through the mesh.
+
+Formally:
+
+```
+Alert(c, t) = 1[ |{i : sᵢ(t′) > τ_local, cᵢ(t′) = c, t − t′ ≤ W}| ≥ q ]
 ```
 
-## 2. Goals and Contributions
-- **Decentralized Correlation**: A gossip-based collective anomaly detection protocol using constant-size anomaly digests and a quorum consensus rule, requiring no central aggregator.
-- **Simulation Framework**: A discrete-event simulation harness in Go evaluating distributed IDS protocols on partitioned real-world traffic (UNSW-NB15) with engineered cross-node attack fragmentation.
-- **Practical Trade-offs**: Empirical characterization of the accuracy–bandwidth–latency trade-off across mesh sizes ($N \in \{8, 16, 32, 64\}$) and gossip fanouts ($f \in \{2, 3, 4\}$) to provide deployment guidance.
-- **Demonstrated Efficacy**: Recovers detection capability for fragmented reconnaissance from 8.7% (independent nodes) up to 89.7% at a fraction of the single-point bandwidth cost.
+Three tunable parameters govern the accuracy–overhead trade-off: mesh size `N`, gossip fanout `f`, and quorum threshold `q`.
 
-## 3. Architecture Details
+---
 
-### 3.1 Local Anomaly Scoring
-Each node $i$ independently observes a partition of network traffic.
-- **Scoring Function**: Computes a local anomaly score $s_i(t) \in [0,1]$ over a sliding window.
-- **Implementation**: We utilize a per-feature z-score deviation against an exponentially-weighted moving baseline. This provides an $O(1)$ update cost, suitable for constrained nodes.
-- **Categorization**: Nodes tag the score with a coarse attack-category hint $c_i(t)$ (e.g., *recon-like*, *dos-like*) derived from heuristics (connection fan-out rate, SYN/ACK ratio). This category acts as the correlation key during gossip aggregation.
+## Methodology
 
-### 3.2 Gossip Digest Exchange
-At fixed intervals $\Delta t$, each node constructs a constant-size digest:
-$$D_i(t) = \langle \text{node\_id}_i, s_i(t), c_i(t), t \rangle$$
-- **Push-Gossip Mechanism**: The node transmits $D_i(t)$ to $f$ randomly selected peers.
-- **Digest Cache**: Receiving nodes merge incoming digests into a local digest cache $C_j$, retaining the most recent digest per source node within a sliding correlation window $W$.
-- **Overhead**: This push-only, constant-fanout design bounds per-node bandwidth to $O(f)$ messages per round, making it independent of the total mesh size $N$.
+### Simulation approach
+The simulator is a **discrete-event simulation in Go**, using goroutines to model independent nodes and channels to model the gossip transport (configurable per-message latency and loss rate). The sim advances in discrete gossip rounds; each round every node selects `f` random peers, exchanges digests, then the quorum rule is re-evaluated. Window `W` and reported convergence latency are both measured in **rounds, not wall-clock time** — this keeps every reported metric on the same axis as the paper's own results (e.g. "2.3 rounds at N=32").
 
-### 3.3 Quorum-Based Escalation
-A node escalates a *collective alert* for category $c$ if, within its digest cache restricted to window $W$, the number of distinct nodes reporting elevated scores ($s_i > \tau_{\text{local}}$) for category $c$ exceeds a quorum threshold $q$.
-- **Equation**: $\text{Alert}(c, t) = \mathbb{1}[ |\{i : s_i(t') > \tau_{\text{local}}, c_i(t')=c, t-t'\le W\}| \ge q ]$
-- **Transitive Correlation**: Because digests propagate epidemically, correlated signals reach a node transitively. A node does not need direct contact with every contributing node to escalate an alert.
+### Dataset
+[UNSW-NB15](https://research.unsw.edu.au/projects/unsw-nb15-dataset) (Moustafa & Slay, MilCIS 2015), standard pre-partitioned train/test split (175,341 / 82,332 records, 49 features).
 
-### 3.4 Node Workflow Diagram
-```mermaid
-sequenceDiagram
-    participant Traffic as Network Traffic
-    participant Local as Local Scorer (Node i)
-    participant Cache as Digest Cache
-    participant Peers as Network Peers
+**Deviation from the original paper draft, and why:** Section IV.B of the initial draft described partitioning by source/destination subnet. The public train/test CSVs don't carry `srcip`/`dstip` — and even the raw captures only contain ~45 synthetic testbed addresses generated by IXIA PerfectStorm, so subnet-based grouping wouldn't produce meaningful per-node diversity regardless. We use **deterministic pseudo-random assignment** across N simulated nodes instead, which is consistent with how most reproducible distributed-IDS evaluations partition this dataset in the literature. The paper's Section IV.B will be updated to describe this precisely rather than claim subnet grouping we aren't doing.
 
-    Traffic->>Local: Ingest local flow partition
-    Local->>Local: Compute z-score s_i(t) & tag category c_i(t)
-    Local->>Cache: Store self digest D_i(t)
-    
-    loop Every Gossip Round (\Delta t)
-        Local->>Peers: Push D_i(t) to f random peers
-        Peers-->>Cache: Receive incoming digests D_j(t)
-        Cache->>Cache: Retain latest digest per peer in window W
-        
-        alt |{peers with s > \tau_{local}}| \ge q
-            Cache->>Cache: Trigger Collective Alert!
-        end
-    end
+### Attack fragmentation
+Two synthetic fragmentation patterns, applied on top of the baseline partition:
+- **Fragmented reconnaissance** — a logical recon campaign's flows are redistributed round-robin across `k ∈ {4, 8, 16}` nodes, so each node individually observes only `1/k` of total scan volume.
+- **Low-rate distributed DoS** — DoS-category flows fragmented and rate-limited per-node to stay under conventional volumetric thresholds, while aggregate rate across all `k` nodes remains attack-level.
+
+### Baselines
+- **Independent** — zero inter-node communication, pure `τ_local` thresholding per node.
+- **Centralized aggregator** — all nodes forward digests to one aggregator every round, applying the same quorum rule with full visibility, given an equivalent total bandwidth budget to SentinelMesh's gossip traffic (for a fair comparison).
+
+### Metrics
+- **Recall** — campaign flows correctly escalated ÷ total campaign flows.
+- **Per-node bandwidth** — bytes sent × rounds, per node.
+- **Convergence latency** — rounds from campaign onset to first correct escalation.
+
+### Sweep parameters
+`N ∈ {8, 16, 32, 64}` × `f ∈ {2, 3, 4}` × `q` × `k ∈ {4, 8, 16}`, defined declaratively in `simulator/configs/sweep_default.yaml` rather than hardcoded, so scaling the mesh size further (e.g. `N=128, 256`) is a config change, not a code change.
+
+### Independent validation (ML cross-check)
+A second, independent local scorer (Python / scikit-learn — isolation forest or autoencoder) trained on the same UNSW-NB15 partition, run entirely outside the Go simulator, to confirm that quorum-escalation results aren't an artifact of the lightweight EWMA scorer being too crude. Cross-check output lands in `results/crosscheck/`, consumed only by the dashboard — it never feeds back into the Go simulator's own numbers.
+
+---
+
+## Repository structure
+
+```
+sentinelmesh/
+├── data/                  # UNSW-NB15 fetch script + raw/processed CSVs
+├── simulator/              # Go — core discrete-event simulator (source of truth for all paper numbers)
+│   ├── cmd/simulate/       # CLI entrypoint, sweep orchestration
+│   ├── internal/
+│   │   ├── dataset/        # CSV loader, Flow struct, category tagging
+│   │   ├── attack/         # node partitioning, k-way fragmentation
+│   │   ├── scorer/         # EWMA local anomaly scorer
+│   │   ├── node/           # per-node state, digest cache
+│   │   ├── gossip/         # round-based push exchange
+│   │   ├── quorum/         # Equation 2 escalation rule (independently testable)
+│   │   ├── baseline/       # independent + centralized baselines
+│   │   └── metrics/        # recall, bandwidth, convergence latency
+│   ├── configs/            # sweep parameters as data
+│   └── testdata/           # small fixtures for unit tests
+├── ml-crosscheck/          # Python — independent scorer validation, decoupled from Go
+├── dashboard/               # Next.js — reads results/ only, never simulator internals
+├── results/                # shared output contract: sweep/, crosscheck/, figures/
+├── docs/
+│   ├── ARCHITECTURE.md     # how the three tracks fit together, data contracts
+│   ├── PAPER_MAPPING.md    # equation/section → file/function map
+│   └── DATASET.md          # provenance, partitioning rationale in full
+└── paper/                  # LaTeX source, figures, references.bib
 ```
 
-## 4. Simulation Methodology
+**Design rule:** no track imports another track's code. `simulator/` writes to `results/sweep/`; `ml-crosscheck/` writes to `results/crosscheck/`, reading the dataset independently; `dashboard/` only ever reads from `results/`. This lets three people work in parallel with zero merge conflicts and zero cross-track blocking.
 
-### 4.1 Discrete-Event Simulator
-Implemented in Go, the simulator models:
-- **Goroutines**: Representing independent nodes.
-- **Channels**: Modeling the gossip transport with configurable message latency and loss rates.
-- **Execution**: Advances in discrete gossip rounds where nodes select $f$ peers, exchange digests, and evaluate the quorum rule.
+---
 
-### 4.2 Traffic Partitioning and Attack Fragmentation
-The simulation utilizes the **UNSW-NB15** test-split flows.
-- **Partitioning**: Flows are partitioned across $N$ simulated nodes by source/destination subnet grouping, approximating distinct network segments.
-- **Fragmented Reconnaissance**: A single logical campaign's flows are redistributed round-robin across $k$ nodes (where $k \in \{4, 8, 16\}$). Each node observes $1/k$ of the total scan volume, falling below the local detection threshold.
-- **Low-Rate Distributed DoS**: Flows are similarly fragmented and rate-limited per-node to bypass volumetric thresholds, while the aggregate request rate remains at attack level.
+## Getting started
 
-### 4.3 Baselines for Comparison
-1. **Independent (No Coordination)**: Each node applies local thresholds with zero inter-node communication. Represents the status quo for isolated edge IDS.
-2. **Centralized Aggregator**: All nodes forward raw digests to a single aggregator every round, which applies the quorum rule with full visibility. Represents conventional SIEM architecture with an equivalent total bandwidth budget.
+```bash
+# 1. Fetch the dataset
+./data/scripts/fetch_dataset.sh
 
-## 5. Evaluation Metrics and Results
+# 2. Run the simulator (small-scale sanity check first)
+cd simulator
+go run ./cmd/simulate --nodes 8 --fanout 2 --quorum 4 --fragment 4
 
-Based on the simulated scenarios, the system is evaluated on:
+# 3. Run the full sweep
+go run ./cmd/simulate --config configs/sweep_default.yaml --out ../results/sweep/results_$(date +%Y%m%d).csv
 
-- **Detection Recall**: Measuring the recovery of detection capability on fragmented attacks. 
-  - *Result*: SentinelMesh recovers recall from an abysmal **8.7%** (isolated nodes at $k=16$ fragmentation) up to **80.2% - 89.7%**, closing the gap caused by the structural blind spot of per-node thresholding.
-- **Bandwidth Overhead**: Measured in KB/s per node. 
-  - *Result*: SentinelMesh maintains near-constant bandwidth ($\sim 1.2$ KB/s at $N=32$, $1.7$ KB/s at $N=64$) compared to linear scaling for the centralized baseline ($\sim 15.1$ KB/s at $N=64$). This is an $8.9\times$ reduction in peak single-point load.
-- **Convergence Latency**: The number of rounds until a quorum is reached after attack onset. 
-  - *Result*: Grows logarithmically with $N$ (e.g., $1.8$ to $2.6$ rounds as $N$ scales from 8 to 64), maintaining rapid detection (median $2.3$ rounds at $N=32$).
-- **Parameter Sensitivity**: Increasing fanout from $f=2$ to $f=4$ improves convergence speed by roughly $30\%$, but $f=3$ offers the best practical balance. A quorum $q=4$ yields a false-positive rate of $2.1\%$, while $q=2$ increases false positives to $7.8\%$.
+# 4. (independent) ML cross-check
+cd ../ml-crosscheck
+pip install -r requirements.txt
+python -m crosscheck.evaluate
 
-## 6. Deployment Implications
-SentinelMesh offers a robust deployment path for resource-constrained network segments (campus networks, branch offices, IoT clusters) lacking dedicated SIEM budgets. The protocol degrades gracefully: offline nodes simply stop contributing digests without disrupting the remaining nodes, effectively removing the single point of total detection blindness inherent to centralized aggregators.
+# 5. (independent) Dashboard
+cd ../dashboard
+npm install && npm run dev
+```
+
+---
+
+## Verification plan
+
+**Automated:**
+- `go test ./simulator/internal/dataset/...` — flow parsing, category tagging
+- `go test ./simulator/internal/attack/...` — k-way fragmentation distribution correctness
+- `go test ./simulator/internal/scorer/...` — EWMA accuracy, O(1) update bound
+- `go test ./simulator/internal/quorum/...` — exact `≥ q` escalation rule, no smoothing/decay
+- `go test ./simulator/internal/gossip/...` — digest merge correctness, window `W` eviction
+
+**Manual:**
+- Run one small-scale simulation (`N=8, f=2, q=4, k=4`), inspect output CSV columns for sane values.
+- Confirm gossip-baseline vs. independent-baseline recall improves as expected, and centralized-baseline recall sits above gossip (expected — full visibility should win, gossip should be close at a fraction of the bandwidth).
+
+---
+
+
+
+## License
+
+MIT

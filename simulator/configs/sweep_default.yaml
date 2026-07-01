@@ -1,0 +1,16 @@
+sweep:
+  # Mesh size configurations
+  N: [8, 16, 32, 64]
+  
+  # Gossip fanout parameters
+  f: [2, 3, 4]
+  
+  # Quorum thresholds
+  q: [2, 4, 8]
+  
+  # Fragmentation configurations (attack distribution)
+  k: [4, 8, 16]
+  
+  # Correlation window (discrete gossip rounds)
+  # Matches the methodology in Section IV.A
+  W: 5
