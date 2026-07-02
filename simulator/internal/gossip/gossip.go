@@ -28,7 +28,7 @@ func (g *Gossiper) Round(round int) {
 		if !ok {
 			continue
 		}
-		if digest.Score == 0 {
+		if digest == nil {
 			continue
 		}
 
@@ -57,10 +57,6 @@ func (g *Gossiper) selectPeers(senderID int) []*node.Node {
 
 func (g *Gossiper) evictStale(round int) {
 	for _, n := range g.nodes {
-		for id, d := range n.DigestCache {
-			if round-d.Round > g.window {
-				delete(n.DigestCache, id)
-			}
-		}
+		n.PurgeStale(round)
 	}
 }
