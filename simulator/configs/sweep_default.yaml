@@ -5,8 +5,8 @@ sweep:
   # Gossip fanout parameters
   f: [2, 3, 4]
   
-  # Quorum thresholds
-  q: [2, 4, 8]
+  # Quorum thresholds (bounded by k=8 for pure signal detection)
+  q: [2, 4, 6, 8]
   
   # Fragmentation configurations (attack distribution)
   k: [4, 8, 16]
@@ -14,3 +14,8 @@ sweep:
   # Correlation window (discrete gossip rounds)
   # Matches the methodology in Section IV.A
   W: 5
+  
+  thresholds:
+    threshold_recon: 1.66
+    threshold_dos: 0.82
+    threshold_ewma: 0.8
