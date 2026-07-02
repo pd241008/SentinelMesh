@@ -33,16 +33,16 @@ This document tracks the completion status of the SentinelMesh project across it
   - [x] Setup `pyproject.toml`, virtual env, and testing frameworks (pytest).
   - [x] Implement data loader for partitioned UNSW-NB15 CSV outputs (reuses dataset format from Track 1).
   - [x] Write unit tests for data loader and preprocessing.
-- [ ] **Sub-phase 2.2: Scorer Models & Training**
-  - [ ] Implement Isolation Forest scorer with configurable hyperparameters.
-  - [ ] Implement Autoencoder-based scorer (PyTorch or TensorFlow).
-  - [ ] Train both models on partitioned normal traffic and evaluate on attack flows.
-  - [ ] Write unit tests for model scoring and inference.
-- [ ] **Sub-phase 2.3: Validation & Reporting**
-  - [ ] Implement automated validation runner comparing Go scorer vs ML models.
-  - [ ] Generate comparison reports (precision, recall, F1 per attack category).
-  - [ ] Write integration tests for the full validation pipeline.
-  - [ ] Output results to `results/crosscheck/` for dashboard consumption.
+- [x] **Sub-phase 2.2: Scorer Models & Training**
+  - [x] Implement Isolation Forest scorer with configurable hyperparameters (`n_estimators`, `max_samples`, `contamination`, `random_state`).
+  - [x] Implement Autoencoder-based scorer (PyTorch) with configurable `latent_dim`, `learning_rate`, `epochs`, `batch_size`.
+  - [x] Train both models on normal traffic and evaluate on all flows — scores normalized to [0, 1].
+  - [x] Write unit tests for model scoring, inference, shape, range, and error handling (15 tests).
+- [x] **Sub-phase 2.3: Validation & Reporting**
+  - [x] Implement automated validation runner (`run_validation`, `generate_crosscheck_report`) comparing Go EWMA scorer vs ML models (Isolation Forest, Autoencoder).
+  - [x] Generate comparison reports — per-category and overall precision/recall/F1, output as CSV + JSON.
+  - [x] Write integration tests for the full validation pipeline (11 tests covering pipeline execution, multi-node, per-category metrics, report output).
+  - [x] Output results to `results/crosscheck/` for dashboard consumption (`summary.csv`, `per_category.csv`, `per_flow_scores.csv`, `report.json`).
 
 ## Track 3: Dashboard (Next.js)
 **Status: In Progress — Phase 3**

@@ -91,30 +91,54 @@ npm run dev
 
 ## 🧪 Testing
 
-### Unit Tests
-Each Go package has accompanying unit tests. Run all simulator tests from the `simulator/` directory:
+### Test Stats (all passing)
+
+| Track | Language | Tests | Packages/Files |
+|---|---|---|---|
+| Core Simulator | Go | **41** | 10 packages |
+| ML Crosscheck | Python | **49** | 3 test files |
+| Dashboard | TypeScript | — | Not yet implemented |
+| **Total** | | **90** | |
+
+### Track 1 — Simulator (Go)
+
+**41 tests** across the following packages:
+
+| Package | Tests | Focus |
+|---|---|---|
+| `dataset` | 3 | CSV parsing, flow extraction, error handling |
+| `fragment` | 3 | Node partitioning, fragmentation, count preservation |
+| `scorer` | 5 | EWMA z-score, bounds, repeatability |
+| `node` | 4 | Node logic, digest cache, flow ingestion |
+| `gossip` | 4 | Epidemic push, peer selection, stale eviction |
+| `quorum` | 5 | Escalation rule, thresholds, multi-category, window |
+| `baseline` | 3 | Independent/centralized runs, no-alert cases |
+| `metrics` | 5 | Recall, bandwidth, latency, edge cases |
+| `sweep` | 3 | Config loading, sweep execution |
+| `tests` (integration) | 3 | Full pipeline, sweep E2E, baseline comparison |
 
 ```bash
-cd simulator
-go test ./... -v
+cd simulator && go test ./... -count=1
 ```
 
-### Integration Tests
-Integration tests covering the full pipeline (data loading → fragmentation → gossip → quorum → metrics) live in `simulator/tests/`:
+### Track 2 — ML Crosscheck (Python)
+
+**49 tests** across 3 files:
+
+| File | Tests | Focus |
+|---|---|---|
+| `test_dataset.py` | 23 | Data loading, labeling, features, split, normalize, partition |
+| `test_models.py` | 15 | Isolation Forest, Autoencoder, Go EWMA replica, score bounds |
+| `test_integration.py` | 11 | Full pipeline, per-category metrics, CSV/JSON report output |
 
 ```bash
-cd simulator
-go test ./tests/... -v
+cd ml-crosscheck && pytest tests/ -v
+# or from project root:
+python -m pytest tests/ml-crosscheck/ -v
 ```
 
 ### Test Data
-A small synthetic CSV dataset is provided at `simulator/testdata/testdata.csv` with 15 flows across multiple attack categories. It is used by both unit and integration tests.
-
-### Running All Tests
-```bash
-cd simulator
-go test ./... -count=1
-```
+A small synthetic CSV dataset at `simulator/testdata/testdata.csv` with 15 flows across 7 attack categories (analysis, backdoor, dos, exploits, fuzzers, generic, reconnaissance) plus normal traffic. Used by both Go and Python test suites.
 
 ---
 
