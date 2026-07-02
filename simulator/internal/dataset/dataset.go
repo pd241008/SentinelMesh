@@ -13,11 +13,13 @@ type Flow struct {
 	Timestamp float64
 	Category  string
 	IsAttack  bool
-	Sbytes int
-	Dbytes int
-	Spkts  int
-	Dpkts  int
-	Rate   float64
+	Sbytes        int
+	Dbytes        int
+	Spkts         int
+	Dpkts         int
+	Rate          float64
+	CtDstLtm      float64
+	CtDstSportLtm float64
 }
 
 func LoadCSV(path string) ([]Flow, error) {
@@ -82,6 +84,12 @@ func LoadCSV(path string) ([]Flow, error) {
 		}
 		if idx, ok := colIdx["rate"]; ok {
 			flow.Rate, _ = strconv.ParseFloat(row[idx], 64)
+		}
+		if idx, ok := colIdx["ct_dst_ltm"]; ok {
+			flow.CtDstLtm, _ = strconv.ParseFloat(row[idx], 64)
+		}
+		if idx, ok := colIdx["ct_dst_sport_ltm"]; ok {
+			flow.CtDstSportLtm, _ = strconv.ParseFloat(row[idx], 64)
 		}
 
 		flows = append(flows, flow)

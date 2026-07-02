@@ -36,7 +36,11 @@ func DistributeFlows(flows []dataset.Flow, numNodes int, k int, attackCategories
 		
 		var assignedNode int
 		if isTargetAttack {
-			assignedNode = rrCount % k
+			actualK := k
+			if actualK > numNodes {
+				actualK = numNodes
+			}
+			assignedNode = rrCount % actualK
 			rrCount++
 		} else {
 			assignedNode = int(hashID(flow.ID) % uint32(numNodes))

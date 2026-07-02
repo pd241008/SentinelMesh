@@ -7,6 +7,11 @@ import (
 
 type AlertTimeline map[int]map[string]bool
 
+type BaselineResult struct {
+	Alerts       AlertTimeline
+	TotalDigests int
+}
+
 func addAlert(alerts AlertTimeline, round int, category string) {
 	if alerts[round] == nil {
 		alerts[round] = make(map[string]bool)
@@ -14,30 +19,32 @@ func addAlert(alerts AlertTimeline, round int, category string) {
 	alerts[round][category] = true
 }
 
-func RunIndependent(nodes []*node.Node, threshold float64, quorumThreshold int, window int, totalRounds int) AlertTimeline {
+func RunIndependent(nodes []*node.Node, window int, totalRounds int, quorumThreshold int) BaselineResult {
 	alerts := make(AlertTimeline)
+	totalDigests := 0
 	for round := 1; round <= totalRounds; round++ {
 		for _, n := range nodes {
 			d, ok := n.ProcessFlowsForRound(round)
 			if !ok {
 				continue
 			}
-			if d.Score > threshold {
-				n.DigestCache[n.ID] = *d
+			if d != nil {
+				totalDigests++
 			}
 		}
 		for _, n := range nodes {
-			for _, cat := range quorum.Evaluate(n.GetCache(), threshold, quorumThreshold, window, round) {
+			for _, cat := range quorum.Evaluate(n.GetCache(), 1, window, round) {
 				addAlert(alerts, round, cat)
 			}
 		}
 	}
-	return alerts
+	return BaselineResult{Alerts: alerts, TotalDigests: totalDigests}
 }
 
-func RunCentralized(nodes []*node.Node, threshold float64, quorumThreshold int, window int, totalRounds int) AlertTimeline {
-	centralCache := make(map[int]node.Digest)
+func RunCentralized(nodes []*node.Node, window int, totalRounds int, quorumThreshold int) BaselineResult {
+	centralCache := make(map[int][]node.Digest)
 	alerts := make(AlertTimeline)
+	totalDigests := 0
 
 	for round := 1; round <= totalRounds; round++ {
 		for _, n := range nodes {
@@ -45,18 +52,27 @@ func RunCentralized(nodes []*node.Node, threshold float64, quorumThreshold int, 
 			if !ok {
 				continue
 			}
-			if d.Score > threshold {
-				centralCache[n.ID] = *d
+			if d != nil {
+				centralCache[n.ID] = append(centralCache[n.ID], *d)
+				totalDigests++
 			}
 		}
-		for _, cat := range quorum.Evaluate(centralCache, threshold, quorumThreshold, window, round) {
+		for _, cat := range quorum.Evaluate(centralCache, quorumThreshold, window, round) {
 			addAlert(alerts, round, cat)
 		}
-		for id := range centralCache {
-			if round-centralCache[id].Round > window {
+		for id, digests := range centralCache {
+			var fresh []node.Digest
+			for _, d := range digests {
+				if round-d.Round <= window {
+					fresh = append(fresh, d)
+				}
+			}
+			if len(fresh) > 0 {
+				centralCache[id] = fresh
+			} else {
 				delete(centralCache, id)
 			}
 		}
 	}
-	return alerts
+	return BaselineResult{Alerts: alerts, TotalDigests: totalDigests}
 }

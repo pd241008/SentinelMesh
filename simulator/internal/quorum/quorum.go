@@ -4,12 +4,21 @@ import (
 	"github.com/pd241008/sentinelmesh/simulator/internal/node"
 )
 
-func Evaluate(cache map[int]node.Digest, threshold float64, quorum int, window int, currentRound int) []string {
+func Evaluate(cache map[int][]node.Digest, quorum int, window int, currentRound int) []string {
 	categoryCount := make(map[string]int)
 
-	for _, d := range cache {
-		if d.Score > threshold && currentRound-d.Round <= window {
-			categoryCount[d.Category]++
+	for _, digests := range cache {
+		// Dedup node's votes: a node gets maximum 1 vote per category within the window W.
+		nodeCats := make(map[string]bool)
+		for _, d := range digests {
+			if currentRound-d.Round <= window {
+				nodeCats[d.Category] = true
+			}
+		}
+		
+		// Increment global count only once per category per source node
+		for cat := range nodeCats {
+			categoryCount[cat]++
 		}
 	}
 

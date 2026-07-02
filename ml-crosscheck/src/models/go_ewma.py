@@ -28,8 +28,9 @@ class _FeatureEWMA:
             z = 0.0
 
         diff = val - self.mean
-        self.mean += self.alpha * diff
-        self.variance = (1.0 - self.alpha) * (self.variance + self.alpha * diff * diff)
+        if abs(z) < 15.0 or self.variance < 0.1:
+            self.mean += self.alpha * diff
+            self.variance = (1.0 - self.alpha) * (self.variance + self.alpha * diff * diff)
         self.count += 1
 
         return abs(z)
@@ -60,7 +61,7 @@ class GoEWMAScorer(BaseScorer):
             row = X[i]
             for j, col in enumerate(available_cols):
                 ewma_name = self.FEATURE_MAP[col]
-                self._features[ewma_name].update(float(row[j]))
+                self._features[ewma_name].update(np.log1p(float(row[j])))
         self._trained = True
 
     def score(self, dataset: FlowDataset) -> np.ndarray:
@@ -74,7 +75,7 @@ class GoEWMAScorer(BaseScorer):
             max_z = 0.0
             for j, col in enumerate(available_cols):
                 ewma_name = self.FEATURE_MAP[col]
-                z = self._features[ewma_name].update(float(row[j]))
+                z = self._features[ewma_name].update(np.log1p(float(row[j])))
                 if z > max_z:
                     max_z = z
             raw = max_z / 5.0
