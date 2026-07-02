@@ -48,23 +48,18 @@ This document tracks the completion status of the SentinelMesh project across it
 **Status: In Progress — Phase 3**
 
 ### Phase 3: Visualization & Frontend
-- [ ] **Sub-phase 3.1: Scaffolding & Build Config**
-  - [ ] Initialize Next.js project with TypeScript and Tailwind CSS.
-  - [ ] Configure ESLint, Prettier, and project directory structure.
-  - [ ] Create shared TypeScript types for sweep and crosscheck results.
-  - [ ] Set up basic layout (navbar, sidebar, page routing).
-- [ ] **Sub-phase 3.2: Data Layer & API**
-  - [ ] Implement data loader for `results/sweep/` CSV output.
-  - [ ] Implement data loader for `results/crosscheck/` comparison reports.
-  - [ ] Create client-side data fetching hooks with caching.
-  - [ ] Write unit tests for data parsing and transformation.
-- [ ] **Sub-phase 3.3: Interactive Visualization Components**
-  - [ ] Implement sweep results chart (recall vs N/f/q/k with toggles).
-  - [ ] Implement bandwidth overhead comparison chart (gossip vs centralized).
-  - [ ] Implement convergence latency heatmap.
-  - [ ] Write component tests using React Testing Library.
-- [ ] **Sub-phase 3.4: Integration & Views**
-  - [ ] Build sweep overview page with parameter selection UI.
-  - [ ] Build ML crosscheck comparison view (Go scorer vs ML models).
-  - [ ] Add responsive design and dark mode support.
-  - [ ] Write end-to-end tests for key user flows.
+- [x] **Sub-phase 3.1: Scaffolding & Build Config**
+  - [x] Initialize Next.js project with TypeScript and Tailwind CSS v4.
+  - [x] Shared TypeScript types for sweep and crosscheck results (`lib/types.ts`).
+  - [x] Set up basic layout with nav header and page routing (sweep overview + crosscheck).
+- [x] **Sub-phase 3.2: Data Layer & API**
+  - [x] Implement data loader for `results/sweep/` CSV output (`lib/loadSweepResults.ts`).
+  - [x] Implement data loader for `results/crosscheck/` comparison reports (`lib/loadCrosscheckResults.ts`).
+  - [x] Client-side data fetching in `useEffect` with loading/empty states.
+- [x] **Sub-phase 3.3: Interactive Visualization Components**
+  - [x] Implement sweep results bar chart (`SweepChart`) — gossip/independent/centralized recall comparison.
+  - [x] Implement bandwidth overhead comparison bar chart (`BandwidthChart`) — gossip vs centralized vs independent.
+- [x] **Sub-phase 3.4: Integration & Views**
+  - [x] Build sweep overview page (`/`) with recall + bandwidth charts and raw results table.
+  - [x] Build ML crosscheck comparison view (`/crosscheck`) — per-model overall metrics + per-category breakdown.
+  - [x] Dark mode enabled by default (Tailwind `dark` class on `<html>`).

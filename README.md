@@ -80,25 +80,32 @@ go run cmd/simulate/main.go --config configs/sweep_default.yaml
 ```
 
 ### 3. View Results
-Results are written as CSV output to the `results/sweep/` directory. You can start the Next.js dashboard to interactively visualize the evaluation metrics:
+Results are written to `results/sweep/` (CSV) and `results/crosscheck/` (CSV + JSON). Start the dashboard:
 ```bash
 cd dashboard
 npm install
 npm run dev
+# Open http://localhost:3000
+```
+
+Then copy results into the dashboard's public directory:
+```bash
+cp -r results/sweep/*.csv dashboard/public/data/
+cp -r results/crosscheck/* dashboard/public/data/
 ```
 
 ---
 
 ## 🧪 Testing
 
-### Test Stats (all passing)
+### Test Stats
 
-| Track | Language | Tests | Packages/Files |
+| Track | Language | Tests / Build | Details |
 |---|---|---|---|
-| Core Simulator | Go | **41** | 10 packages |
-| ML Crosscheck | Python | **49** | 3 test files |
-| Dashboard | TypeScript | — | Not yet implemented |
-| **Total** | | **90** | |
+| Core Simulator | Go | **41 tests** | 10 packages |
+| ML Crosscheck | Python | **49 tests** | 3 test files |
+| Dashboard | TypeScript | **Builds** | 2 routes, 2 chart components |
+| **Total** | | **90 tests + clean build** | |
 
 ### Track 1 — Simulator (Go)
 
@@ -135,6 +142,17 @@ cd simulator && go test ./... -count=1
 cd ml-crosscheck && pytest tests/ -v
 # or from project root:
 python -m pytest tests/ml-crosscheck/ -v
+```
+
+### Track 3 — Dashboard (Next.js)
+
+**Clean build** with no lint errors. Two routes:
+- `/` — Sweep overview: recall chart, bandwidth chart, raw results table
+- `/crosscheck` — ML crosscheck comparison view with overall + per-category tables
+
+```bash
+cd dashboard
+npm run build
 ```
 
 ### Test Data

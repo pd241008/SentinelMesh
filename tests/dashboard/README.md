@@ -3,18 +3,25 @@
 Next.js-based tests for the dashboard (Track 3).
 
 ## Status
-- **Not yet implemented** — Track 3 is still in Phase 3 (scaffolding not started)
+- **Build passes** with 2 routes and 2 chart components
+- Unit tests for data loaders and components **not yet written**
 - Placeholder directory for future component, integration, and E2E tests
+
+## Current implementation
+| Route | Content |
+|---|---|
+| `/` | Sweep overview — recall chart (gossip/independent/centralized), bandwidth chart, raw results table |
+| `/crosscheck` | ML crosscheck — overall metrics table + per-category breakdown |
 
 ## Planned test suites
 | Suite | Focus |
 |---|---|
-| Unit | Data parsing, transformation hooks |
-| Component | Sweep chart, bandwidth chart, latency heatmap |
-| E2E | Key user flows (parameter selection, crosscheck view) |
+| Unit | CSV parsing (`parseSweepCSV`), data transformation |
+| Component | SweepChart, BandwidthChart rendering with mock data |
+| E2E | Key user flows (navigation, data load states) |
 
-## Run (once implemented)
+## Verify build
 ```bash
 cd dashboard
-npm test
+npm run build
 ```
