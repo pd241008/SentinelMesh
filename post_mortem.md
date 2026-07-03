@@ -7,6 +7,19 @@ This document serves as a retrospective on the critical bugs and structural regr
 **Root Cause:** In the initial campaign fragmentation logic (`fragment.go`), synthetic campaigns were constructed by taking genuine benign flows and merely altering their `Category` label to "dos" or "reconnaissance". Because the underlying packet features (e.g., rate, bytes, `ct_dst_ltm`) remained entirely benign, the local anomaly scorer evaluated them as normal traffic. The system was expecting the `Category` string to act as an oracle, but the scorer was strictly feature-driven.
 **Fix:** Refactored `fragment.go` to extract actual, genuine targeted attack flows from the UNSW-NB15 dataset (containing real anomalous feature spikes) and structurally distributed those real flows across the $k$ target nodes.
 
+```mermaid
+graph TD
+    subgraph Oracle Bug (Flawed Fragmentation)
+    F1[Normal Flow] -->|Label switched to 'dos'| Node1[Node Scorer]
+    Node1 -->|Features remain benign| Miss[Evaluated as Normal]
+    end
+    
+    subgraph Corrected Pattern (Genuine Extraction)
+    F2[Real Target Attack Flow] -->|Extracted from dataset| Node2[Node Scorer]
+    Node2 -->|Anomalous features trigger| Alert[Evaluated as Malicious]
+    end
+```
+
 ## 2. The String Mismatch Bug
 **Symptom:** After injecting real attack flows, recall remained artificially deflated.
 **Root Cause:** A silent failure in categorical mapping. The simulator configuration and fragmentation logic used capitalized strings (e.g., "Reconnaissance"), while the raw dataset parsed everything in lowercase ("reconnaissance"). The string equality checks failed silently, effectively swallowing the injected campaign flows and dropping them into a void.
@@ -36,3 +49,24 @@ This document serves as a retrospective on the critical bugs and structural regr
 **Symptom:** Survival fractions indicated that the system was achieving high recall, but it was unclear how much of that was genuine structural propagation versus background noise happening to coalesce.
 **Root Cause:** Dense ambient background traffic in a large mesh can randomly trigger localized threshold breaches that accidentally satisfy the quorum $q$, completely independent of the injected campaign structure.
 **Fix:** Designed and implemented a rigid exact-round **Matched Counterfactual Control**. By running a parallel simulation where the campaign flows are explicitly replaced with resampled benign flows (neutralizing the signal while perfectly preserving the traffic density and timeline), we mathematically isolated and subtracted out alerts that were purely driven by background noise. This proved that lower quorums ($q=2$) were severely propped up by noise, while higher quorums ($q=8$) successfully isolated the genuine signal.
+
+```mermaid
+graph TD
+    subgraph Treatment Run
+    T1[Targeted Attack Flow] --> NodeT[Node]
+    B1[Dense Background Traffic] --> NodeT
+    NodeT -->|Triggers| AlertT{Quorum Trigger}
+    end
+    
+    subgraph Control Run
+    C1[Benign Resampled Flow] --> NodeC[Node]
+    B2[Identical Dense Background] --> NodeC
+    NodeC -->|Triggers| AlertC{Quorum Trigger}
+    end
+    
+    AlertT -->|Match| Comp[Counterfactual Evaluator]
+    AlertC -->|Match| Comp
+    Comp -->|Round & Node-Set Match?| Res
+    Res -->|Yes| Spurious[Discard as Spurious Noise]
+    Res -->|No| Genuine[Keep as Genuine Signal]
+```

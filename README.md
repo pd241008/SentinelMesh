@@ -6,6 +6,11 @@ SentinelMesh replaces the centralized aggregator with a lightweight, decentraliz
 
 ---
 
+## 🔍 Validation & Deep-Dive
+For a detailed technical retrospective on the metrics pipeline validation, structural bugs resolved, and the matched counterfactual control architecture that isolates genuine propagation signal from ambient mesh noise, please see the [Bug Post-Mortem](post_mortem.md).
+
+---
+
 ## 🏛 Architecture
 
 ### System Topology
