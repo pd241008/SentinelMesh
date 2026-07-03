@@ -17,14 +17,14 @@ This document serves as a retrospective on the critical bugs and structural regr
 
 ```mermaid
 graph TD
-    subgraph Oracle Bug (Flawed Fragmentation)
-    F1[Normal Flow] -->|Label switched to 'dos'| Node1[Node Scorer]
-    Node1 -->|Features remain benign| Miss[Evaluated as Normal]
+    subgraph OracleBug ["Oracle Bug (Flawed Fragmentation)"]
+    F1["Normal Flow"] -->|Label switched to 'dos'| Node1["Node Scorer"]
+    Node1 -->|Features remain benign| Miss["Evaluated as Normal"]
     end
     
-    subgraph Corrected Pattern (Genuine Extraction)
-    F2[Real Target Attack Flow] -->|Extracted from dataset| Node2[Node Scorer]
-    Node2 -->|Anomalous features trigger| Alert[Evaluated as Malicious]
+    subgraph CorrectedPattern ["Corrected Pattern (Genuine Extraction)"]
+    F2["Real Target Attack Flow"] -->|Extracted from dataset| Node2["Node Scorer"]
+    Node2 -->|Anomalous features trigger| Alert["Evaluated as Malicious"]
     end
 ```
 
@@ -108,21 +108,21 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph Treatment Run
-    T1[Targeted Attack Flow] --> NodeT[Node]
-    B1[Dense Background Traffic] --> NodeT
-    NodeT -->|Triggers| AlertT{Quorum Trigger}
+    subgraph TreatmentRun ["Treatment Run"]
+    T1["Targeted Attack Flow"] --> NodeT["Node"]
+    B1["Dense Background Traffic"] --> NodeT
+    NodeT -->|Triggers| AlertT{"Quorum Trigger"}
     end
     
-    subgraph Control Run
-    C1[Benign Resampled Flow] --> NodeC[Node]
-    B2[Identical Dense Background] --> NodeC
-    NodeC -->|Triggers| AlertC{Quorum Trigger}
+    subgraph ControlRun ["Control Run"]
+    C1["Benign Resampled Flow"] --> NodeC["Node"]
+    B2["Identical Dense Background"] --> NodeC
+    NodeC -->|Triggers| AlertC{"Quorum Trigger"}
     end
     
-    AlertT -->|Match| Comp[Counterfactual Evaluator]
+    AlertT -->|Match| Comp["Counterfactual Evaluator"]
     AlertC -->|Match| Comp
     Comp -->|Round & Node-Set Match?| Res
-    Res -->|Yes| Spurious[Discard as Spurious Noise]
-    Res -->|No| Genuine[Keep as Genuine Signal]
+    Res -->|Yes| Spurious["Discard as Spurious Noise"]
+    Res -->|No| Genuine["Keep as Genuine Signal"]
 ```
