@@ -2,7 +2,13 @@
 
 **SentinelMesh** is a decentralized anomaly correlation framework designed for distributed network intrusion sensing. Modern network defense typically relies on centralized Security Information and Event Management (SIEM) pipelines, which create latency bottlenecks, incur massive bandwidth costs, and introduce a single point of failure.
 
-SentinelMesh replaces the centralized aggregator with a lightweight, decentralized **gossip-based correlation** mechanism. Independent IDS nodes exchange compact anomaly summaries via an epidemic protocol, utilizing a quorum consensus rule to collectively escalate "low-and-slow" attacks (e.g., distributed port scans, credential stuffing) that appear statistically normal to any single node.
+SentinelMesh replaces the centralized aggregator with a lightweight, decentralized **gossip-based correlation** mechanism. Independent IDS nodes exchange compact anomaly summaries via an epidemic protocol, utilizing a quorum consensus rule to collectively escalate "low-and-slow" attacks (e.g., distributed port scans, credential stuffing) that appear statistically normal to any single edge node.
+
+### 🎯 Purpose & Capabilities
+- **Resilient Intrusion Sensing:** Detects highly fragmented, structured volumetric campaigns that deliberately evade single-node detection boundaries.
+- **Matched Counterfactual Evaluation:** The simulation engine features a mathematically rigorous pipeline that isolates genuine structured campaign signals from ambient mesh noise using exact-round matched resampling.
+- **High-Performance Simulation:** A fully optimized $O(N \times R)$ discrete-event simulator written in Go capable of sweeping massive parameter grids (mesh size $N$, fanout $f$, fragmentation $k$, quorum $q$) in seconds.
+- **Multi-Track Validation:** Independent tracks for simulation (Go), cross-check machine learning baseline validation (Python), and visual exploration (Next.js).
 
 ---
 
@@ -78,14 +84,21 @@ The simulation utilizes the standard UNSW-NB15 dataset. Download it using the pr
 ```
 
 ### 2. Run the Simulator
-Navigate to the simulator track and run a parameter sweep using the default configuration values. *(Execution CLI is under active development)*:
+### 2. Run the Full Grid Sweep
+Navigate to the simulator directory. You can run the optimized Go simulator directly, or use the Python orchestrator to run the full cross-seed sweep and generate the aggregated master grid:
 ```bash
 cd simulator
-go run cmd/simulate/main.go --config configs/sweep_default.yaml
+go build -o simulate cmd/simulate/main.go
+
+# Option A: Run a single seed directly
+./simulate --data ../data/raw/UNSW_NB15_testing-set.csv --config configs/sweep_default.yaml --seed 42
+
+# Option B: Run the full 3-seed automated grid orchestrator
+python3 scripts/run_full_grid.py
 ```
 
 ### 3. View Results
-Results are written to `results/sweep/` (CSV) and `results/crosscheck/` (CSV + JSON). Start the dashboard:
+Aggregated master results are written to `results/full_grid/master_grid.csv`. To view the interactive web visualization, start the dashboard:
 ```bash
 cd dashboard
 npm install
