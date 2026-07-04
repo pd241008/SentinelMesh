@@ -88,3 +88,7 @@ func (n *Node) PurgeStale(currentRound int) {
 func (n *Node) GetCache() map[int][]Digest {
 	return n.DigestCache
 }
+
+func (n *Node) ClearCache() {
+	n.DigestCache = make(map[int][]Digest)
+}

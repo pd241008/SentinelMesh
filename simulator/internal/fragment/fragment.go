@@ -25,15 +25,15 @@ func hashID(id int) uint32 {
 	return h.Sum32()
 }
 
-func DistributeFlows(flows []dataset.Flow, numNodes int, k int, attackCategories []string) ([][]dataset.Flow, []Campaign) {
-	return distributeFlowsInternal(flows, nil, numNodes, k, attackCategories, false)
+func DistributeFlows(flows []dataset.Flow, numNodes int, k int, attackCategories []string, clustered bool) ([][]dataset.Flow, []Campaign) {
+	return distributeFlowsInternal(flows, nil, numNodes, k, attackCategories, false, clustered)
 }
 
-func DistributeFlowsControl(flows []dataset.Flow, normalPool []dataset.Flow, numNodes int, k int, attackCategories []string) ([][]dataset.Flow, []Campaign) {
-	return distributeFlowsInternal(flows, normalPool, numNodes, k, attackCategories, true)
+func DistributeFlowsControl(flows []dataset.Flow, normalPool []dataset.Flow, numNodes int, k int, attackCategories []string, clustered bool) ([][]dataset.Flow, []Campaign) {
+	return distributeFlowsInternal(flows, normalPool, numNodes, k, attackCategories, true, clustered)
 }
 
-func distributeFlowsInternal(flows []dataset.Flow, normalPool []dataset.Flow, numNodes int, k int, attackCategories []string, isControl bool) ([][]dataset.Flow, []Campaign) {
+func distributeFlowsInternal(flows []dataset.Flow, normalPool []dataset.Flow, numNodes int, k int, attackCategories []string, isControl bool, clustered bool) ([][]dataset.Flow, []Campaign) {
 	partitions := make([][]dataset.Flow, numNodes)
 
 	attackCatMap := make(map[string]bool)
@@ -56,7 +56,19 @@ func distributeFlowsInternal(flows []dataset.Flow, normalPool []dataset.Flow, nu
 			if actualK > numNodes {
 				actualK = numNodes
 			}
-			assignedNode = rrCount % actualK
+			if clustered {
+				if rrCount % 5 != 0 {
+					assignedNode = 0
+				} else {
+					if actualK > 1 {
+						assignedNode = 1 + ((rrCount / 5) % (actualK - 1))
+					} else {
+						assignedNode = 0
+					}
+				}
+			} else {
+				assignedNode = rrCount % actualK
+			}
 			rrCount++
 
 			if currentCampaign == nil || currentCampaign.Category != cat {

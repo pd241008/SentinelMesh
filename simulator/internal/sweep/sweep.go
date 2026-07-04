@@ -84,7 +84,7 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64, seed int64, outputDir string) error {
+func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64, seed int64, outputDir string, coldStart bool, clustered bool) error {
 	var results []RunResult
 	idx := int64(0)
 
@@ -102,8 +102,8 @@ func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64,
 
 	for _, N := range cfg.Sweep.N {
 		for _, k := range cfg.Sweep.K {
-			tPartitions, tCampaigns := fragment.DistributeFlows(allFlows, N, k, AttackCategories)
-			cPartitions, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, AttackCategories)
+			tPartitions, tCampaigns := fragment.DistributeFlows(allFlows, N, k, AttackCategories, clustered)
+			cPartitions, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, AttackCategories, clustered)
 
 			totalRounds := 0
 			for _, p := range tPartitions {
@@ -128,10 +128,10 @@ func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64,
 					}
 
 					gossipNodesT := makeNodes(N, tPartitions, alpha, cfg.Sweep.W, thresh)
-					gResultT := runGossip(gossipNodesT, f, cfg.Sweep.W, q, totalRounds, seed+idx)
+					gResultT := runGossip(gossipNodesT, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
 
 					gossipNodesC := makeNodes(N, cPartitions, alpha, cfg.Sweep.W, thresh)
-					gResultC := runGossip(gossipNodesC, f, cfg.Sweep.W, q, totalRounds, seed+idx)
+					gResultC := runGossip(gossipNodesC, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
 
 					gMetrics := metrics.Compute(gossipNodesT, allFlows, gResultT.alerts, gResultC.alerts, gResultT.totalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
 					
@@ -193,11 +193,30 @@ type gossipResult struct {
 	totalDigests  int
 }
 
-func runGossip(nodes []*node.Node, f, w int, q int, rounds int, seed int64) gossipResult {
+func runGossip(nodes []*node.Node, f, w int, q int, rounds int, seed int64, coldStart bool) gossipResult {
 	g := gossip.New(nodes, f, w, seed)
 	alerts := make(baseline.AlertTimeline)
 
+	firstAttackRound := -1
+	if coldStart {
+		for _, n := range nodes {
+			for r, f := range n.Flows {
+				if f.IsAttack {
+					if firstAttackRound == -1 || r+1 < firstAttackRound {
+						firstAttackRound = r+1
+					}
+					break
+				}
+			}
+		}
+	}
+
 	for round := 1; round <= rounds; round++ {
+		if coldStart && round == firstAttackRound {
+			for _, n := range nodes {
+				n.ClearCache()
+			}
+		}
 		g.Round(round)
 
 		for _, n := range nodes {

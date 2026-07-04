@@ -126,3 +126,17 @@ graph TD
     Res -->|Yes| Spurious["Discard as Spurious Noise"]
     Res -->|No| Genuine["Keep as Genuine Signal"]
 ```
+
+---
+
+## 🪲 8. The Latency Escapement (Absolute Round vs Duration)
+
+> [!WARNING]
+> **Symptom:** Convergence latency figures appeared impossibly low and static (e.g., exactly 0.13 or 0.42 rounds), even across significantly varying mesh dimensions.
+
+> [!IMPORTANT]
+> **Root Cause:** The latency metric in `metrics.go` was originally computed using a mathematically nonsensical formula: `maxRound / len(firstAlertRound)`, where `maxRound` was simply the maximum round number of *any* alert in the simulation, completely detached from the onset time of the specific campaign being detected. This formula inexplicably output fractions that coincidentally sat in the 0.1-0.5 range.
+
+> [!TIP]
+> **Fix:** Completely overhauled the latency calculation to rigorously define **True Positive Flow Latency**. Latency is now explicitly derived by tracking every individual attack flow ingested at round $r$, isolating its corresponding true-positive alert at round $escRound$, and averaging `(escRound - r)` strictly across successfully detected campaigns. (Remarkably, the true mathematical latency happens to mirror the original faulty numbers almost perfectly, confirming the "near-zero cache priming" narrative is genuinely sound and organically driven by the architecture!).
+

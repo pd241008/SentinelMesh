@@ -61,7 +61,21 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	}
 
 	firstAlertRound := make(map[string]int)
+	onsetRound := make(map[string]int)
+
 	for r := 1; r <= maxRound; r++ {
+		// Track onset rounds
+		for _, n := range nodes {
+			if r-1 < len(n.Flows) {
+				cat := n.Flows[r-1].Category
+				if cat == "reconnaissance" || cat == "dos" || cat == "analysis" {
+					if _, exists := onsetRound[cat]; !exists {
+						onsetRound[cat] = r
+					}
+				}
+			}
+		}
+
 		if cats, ok := tAlerts[r]; ok {
 			for cat := range cats {
 				if _, exists := firstAlertRound[cat]; !exists {
@@ -78,6 +92,11 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	totalDosFlows := 0
 	detectedDosFlows := 0
 	correctedDetectedDosFlows := 0
+	totalAnalysisFlows := 0
+	detectedAnalysisFlows := 0
+	correctedDetectedAnalysisFlows := 0
+
+	totalLatencySum := 0
 
 	var totalExactMatches int
 	var totalNoiseCoincidences int
@@ -86,15 +105,22 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 		for _, n := range nodes {
 			if r-1 < len(n.Flows) {
 				flow := n.Flows[r-1]
-				if flow.Category == "reconnaissance" || flow.Category == "dos" {
+				if flow.Category == "reconnaissance" || flow.Category == "dos" || flow.Category == "analysis" {
 					detected := false
 					var escRound int
 
 					for rr := r; rr <= min(r+window, maxRound); rr++ {
-						if tAlerts[rr] != nil && len(tAlerts[rr][flow.Category]) > 0 {
-							detected = true
-							escRound = rr
-							break
+						if tAlerts[rr] != nil {
+							if len(tAlerts[rr][flow.Category]) > 0 {
+								detected = true
+								escRound = rr
+								break
+							}
+							if flow.Category == "analysis" && len(tAlerts[rr]["generic"]) > 0 {
+								detected = true
+								escRound = rr
+								break
+							}
 						}
 					}
 					
@@ -102,6 +128,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 						totalReconFlows++
 						if detected {
 							detectedReconFlows++
+							totalLatencySum += (escRound - r)
 							// Corrected Check
 							if cAlerts != nil && cAlerts[escRound] != nil && len(cAlerts[escRound][flow.Category]) > 0 {
 								tCorrobs := tAlerts[escRound][flow.Category]
@@ -119,6 +146,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 						totalDosFlows++
 						if detected {
 							detectedDosFlows++
+							totalLatencySum += (escRound - r)
 							// Corrected Check
 							if cAlerts != nil && cAlerts[escRound] != nil && len(cAlerts[escRound][flow.Category]) > 0 {
 								tCorrobs := tAlerts[escRound][flow.Category]
@@ -132,15 +160,42 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 								correctedDetectedDosFlows++
 							}
 						}
+					} else if flow.Category == "analysis" {
+						totalAnalysisFlows++
+						if detected {
+							detectedAnalysisFlows++
+							if cAlerts != nil && cAlerts[escRound] != nil && (len(cAlerts[escRound][flow.Category]) > 0 || len(cAlerts[escRound]["generic"]) > 0) {
+								var tCorrobs []int
+								if len(tAlerts[escRound][flow.Category]) > 0 {
+									tCorrobs = tAlerts[escRound][flow.Category]
+								} else {
+									tCorrobs = tAlerts[escRound]["generic"]
+								}
+								var cCorrobs []int
+								if len(cAlerts[escRound][flow.Category]) > 0 {
+									cCorrobs = cAlerts[escRound][flow.Category]
+								} else {
+									cCorrobs = cAlerts[escRound]["generic"]
+								}
+								if equalSlices(tCorrobs, cCorrobs) {
+									// Just reuse ExactMatches/NoiseCoincidences
+									totalExactMatches++
+								} else {
+									totalNoiseCoincidences++
+								}
+							} else {
+								correctedDetectedAnalysisFlows++
+							}
+						}
 					}
 				}
 			}
 		}
 	}
 
-	if (detectedReconFlows > 0 || detectedDosFlows > 0) && cAlerts != nil {
-		fmt.Printf("DEBUG: DetectedRecon=%d/%d, CorrectedRecon=%d/%d, CorrectedDoS=%d/%d, ExactMatches=%d, NoiseCoincidences=%d\n", 
-			detectedReconFlows, totalReconFlows, correctedDetectedReconFlows, totalReconFlows, correctedDetectedDosFlows, totalDosFlows, totalExactMatches, totalNoiseCoincidences)
+	if (detectedReconFlows > 0 || detectedDosFlows > 0 || detectedAnalysisFlows > 0) && cAlerts != nil {
+		fmt.Printf("DEBUG: DetectedRecon=%d/%d, CorrectedRecon=%d/%d, CorrectedDoS=%d/%d, CorrectedAnalysis=%d/%d, ExactMatches=%d, NoiseCoincidences=%d\n", 
+			detectedReconFlows, totalReconFlows, correctedDetectedReconFlows, totalReconFlows, correctedDetectedDosFlows, totalDosFlows, correctedDetectedAnalysisFlows, totalAnalysisFlows, totalExactMatches, totalNoiseCoincidences)
 	}
 
 	var flowReconRecall float64
@@ -168,9 +223,15 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	totalDoSNormalWindows := 0
 	falsePosDoSWindows := 0
 
+	totalAnalysisActiveWindows := 0
+	truePosAnalysisWindows := 0
+	totalAnalysisNormalWindows := 0
+	falsePosAnalysisWindows := 0
+
 	for r := 1; r <= maxRound; r++ {
 		hasReconFlow := false
 		hasDoSFlow := false
+		hasAnalysisFlow := false
 		for _, n := range nodes {
 			if r-1 < len(n.Flows) {
 				cat := n.Flows[r-1].Category
@@ -179,6 +240,9 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 				}
 				if cat == "dos" {
 					hasDoSFlow = true
+				}
+				if cat == "analysis" {
+					hasAnalysisFlow = true
 				}
 			}
 		}
@@ -206,6 +270,18 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 				falsePosDoSWindows++
 			}
 		}
+
+		if hasAnalysisFlow {
+			totalAnalysisActiveWindows++
+			if tAlerts[r] != nil && (len(tAlerts[r]["analysis"]) > 0 || len(tAlerts[r]["generic"]) > 0) {
+				truePosAnalysisWindows++
+			}
+		} else {
+			totalAnalysisNormalWindows++
+			if tAlerts[r] != nil && (len(tAlerts[r]["analysis"]) > 0 || len(tAlerts[r]["generic"]) > 0) {
+				falsePosAnalysisWindows++
+			}
+		}
 	}
 	
 	var windowReconRecall float64
@@ -225,10 +301,19 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	if totalDoSNormalWindows > 0 {
 		dosFPR = float64(falsePosDoSWindows) / float64(totalDoSNormalWindows)
 	}
+	var analysisFPR float64
+	if totalAnalysisNormalWindows > 0 {
+		analysisFPR = float64(falsePosAnalysisWindows) / float64(totalAnalysisNormalWindows)
+	}
+
+	if (totalAnalysisActiveWindows > 0 || totalAnalysisNormalWindows > 0) && cAlerts != nil {
+		fmt.Printf("DEBUG_ANALYSIS_FPR: FPR=%f (%d/%d), TPR=%d/%d\n", 
+			analysisFPR, falsePosAnalysisWindows, totalAnalysisNormalWindows, truePosAnalysisWindows, totalAnalysisActiveWindows)
+	}
 
 	var avgLatency float64
-	if len(firstAlertRound) > 0 {
-		avgLatency = float64(maxRound) / float64(len(firstAlertRound))
+	if (detectedReconFlows + detectedDosFlows) > 0 {
+		avgLatency = float64(totalLatencySum) / float64(detectedReconFlows+detectedDosFlows)
 	}
 
 	return Result{

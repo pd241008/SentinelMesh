@@ -1,4 +1,10 @@
-# SentinelMesh: Gossip-Propagated Collective Anomaly Detection
+# SentinelMesh Simulator
+
+SentinelMesh is an exploratory simulation framework designed to evaluate the efficacy of decentralized, quorum-based intrusion detection systems (IDS) in resource-constrained mesh networks. Its primary purpose is to mathematically validate whether lightweight, edge-deployed IDS nodes can successfully coordinate to detect distributed, fragmented attacks (like slow-and-low reconnaissance or multi-origin DoS) that slip past individual node heuristics.
+
+SentinelMesh tests the hypothesis that **decentralized gossip protocols combined with a simple scoring heuristic can match the detection capabilities of a centralized SIEM**, but with orders of magnitude less bandwidth overhead. It achieves this by simulating the UNSW-NB15 dataset over virtualized mesh topologies.
+
+## 🚀 Quick Start & Project Overview
 
 **SentinelMesh** is a decentralized anomaly correlation framework designed for distributed network intrusion sensing. Modern network defense typically relies on centralized Security Information and Event Management (SIEM) pipelines, which create latency bottlenecks, incur massive bandwidth costs, and introduce a single point of failure.
 
@@ -178,9 +184,9 @@ A small synthetic CSV dataset at `simulator/testdata/testdata.csv` with 15 flows
 
 ---
 
-## 📊 Evaluation Goals
+## 📊 Evaluation Goals & Mathematical Rigor
 
-Based on discrete-event simulation using partitioned UNSW-NB15 traffic, this framework aims to measure:
-- **Detection Recall**: The system's ability to recover detection capability for fragmented reconnaissance against baseline isolated edge nodes.
-- **Bandwidth Overhead**: The reduction in peak single-point load compared to a centralized SIEM, tracking per-node payload costs.
-- **Convergence Latency**: The scaling behavior of gossip propagation across varying mesh sizes, measured in discrete gossip rounds.
+Based on discrete-event simulation using partitioned UNSW-NB15 traffic, this framework rigorously measures:
+- **Detection Recall**: The system's ability to recover detection capability for fragmented reconnaissance against baseline isolated edge nodes, utilizing a robust **Matched Counterfactual Control (MCC)** mechanism to perfectly subtract out spurious noise.
+- **Bandwidth Overhead**: The reduction in peak single-point load compared to a centralized SIEM, explicitly tracking the $1/N$ dilution constraint.
+- **Convergence Latency**: The scaling behavior of gossip propagation across varying mesh sizes, measured via rigorous True Positive Flow escalation time (averaging `escRound - r`).
