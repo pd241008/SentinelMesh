@@ -17,6 +17,8 @@ func main() {
 	alpha := flag.Float64("alpha", 0.3, "EWMA smoothing factor")
 	threshold := flag.Float64("threshold", 0.5, "local anomaly score threshold")
 	seed := flag.Int64("seed", 42, "random seed for reproducibility")
+	coldStart := flag.Bool("cold-start", false, "clear cache before onsetRound")
+	clustered := flag.Bool("clustered", false, "use 80/20 clustered fragmentation")
 	flag.Parse()
 
 	if *dataPath == "" {
@@ -44,7 +46,7 @@ func main() {
 	}
 	log.Printf("Attack flows: %d / %d", attackFlows, len(allFlows))
 
-	if err := sweep.Run(cfg, allFlows, *alpha, *threshold, *seed, *outputDir); err != nil {
+	if err := sweep.Run(cfg, allFlows, *alpha, *threshold, *seed, *outputDir, *coldStart, *clustered); err != nil {
 		log.Fatalf("sweep failed: %v", err)
 	}
 }

@@ -1,0 +1,9 @@
+sweep:
+  N: [32]
+  f: [3]
+  k: [8]
+  W: 5
+  thresholds:
+    threshold_recon: 1.66
+    threshold_dos: 0.82
+    threshold_ewma: 0.89
