@@ -22,3 +22,8 @@ __pycache__/
 
 
 dashboard/public/data/
+
+# Generated results
+results/canonical_table/
+results/sweep_*/
+results/task*/
