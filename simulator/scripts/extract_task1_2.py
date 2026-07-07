@@ -8,13 +8,16 @@ def main():
         print(f"Error reading CSV: {e}")
         return
 
-    print("=== TASK 1: Canonical Recall Table (N=32, f=3, k=8) ===")
+    print("=== TASK 1: Canonical Recall & FPR Table (N=32, f=3, k=8) ===")
     t1 = df[(df['N']==32) & (df['f']==3) & (df['k']==8)].sort_values('q')
     for _, row in t1.iterrows():
         q = int(row['q'])
         r_mean, r_std = row['gossip_corrected_flow_recon_recall_mean'], row['gossip_corrected_flow_recon_recall_std']
         d_mean, d_std = row['gossip_corrected_flow_dos_recall_mean'], row['gossip_corrected_flow_dos_recall_std']
-        print(f"q={q}: Recon = {r_mean*100:.2f}% ± {r_std*100:.2f}%, DoS = {d_mean*100:.2f}% ± {d_std*100:.2f}%")
+        rfpr_mean, rfpr_std = row['gossip_recon_fpr_mean'], row['gossip_recon_fpr_std']
+        dfpr_mean, dfpr_std = row['gossip_dos_fpr_mean'], row['gossip_dos_fpr_std']
+        print(f"q={q}: Recon = {r_mean*100:.2f}% ± {r_std*100:.2f}%, DoS = {d_mean*100:.2f}% ± {d_std*100:.2f}% | "
+              f"Recon FPR = {rfpr_mean*100:.2f}% ± {rfpr_std*100:.2f}%, DoS FPR = {dfpr_mean*100:.2f}% ± {dfpr_std*100:.2f}%")
 
     print("\n=== TASK 2: Fanout-Fragmentation Crossover (N=64, q=4) ===")
     t2 = df[(df['N']==64) & (df['q']==4)].sort_values(['k', 'f'])
