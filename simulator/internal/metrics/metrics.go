@@ -47,7 +47,7 @@ func equalSlices(a, b []int) bool {
 	return true
 }
 
-func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.AlertTimeline, cAlerts baseline.AlertTimeline, totalDigests int, window int, campaigns []fragment.Campaign, totalRounds int, numNodes int) Result {
+func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.AlertTimeline, cAlertsRecon baseline.AlertTimeline, cAlertsDoS baseline.AlertTimeline, cAlertsAnalysis baseline.AlertTimeline, totalDigests int, window int, campaigns []fragment.Campaign, totalRounds int, numNodes int) Result {
 	maxRound := totalRounds
 
 	// Bandwidth
@@ -130,9 +130,9 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 							detectedReconFlows++
 							totalLatencySum += (escRound - r)
 							// Corrected Check
-							if cAlerts != nil && cAlerts[escRound] != nil && len(cAlerts[escRound][flow.Category]) > 0 {
+							if cAlertsRecon != nil && cAlertsRecon[escRound] != nil && len(cAlertsRecon[escRound][flow.Category]) > 0 {
 								tCorrobs := tAlerts[escRound][flow.Category]
-								cCorrobs := cAlerts[escRound][flow.Category]
+								cCorrobs := cAlertsRecon[escRound][flow.Category]
 								if equalSlices(tCorrobs, cCorrobs) {
 									totalExactMatches++
 								} else {
@@ -148,9 +148,9 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 							detectedDosFlows++
 							totalLatencySum += (escRound - r)
 							// Corrected Check
-							if cAlerts != nil && cAlerts[escRound] != nil && len(cAlerts[escRound][flow.Category]) > 0 {
+							if cAlertsDoS != nil && cAlertsDoS[escRound] != nil && len(cAlertsDoS[escRound][flow.Category]) > 0 {
 								tCorrobs := tAlerts[escRound][flow.Category]
-								cCorrobs := cAlerts[escRound][flow.Category]
+								cCorrobs := cAlertsDoS[escRound][flow.Category]
 								if equalSlices(tCorrobs, cCorrobs) {
 									totalExactMatches++
 								} else {
@@ -164,7 +164,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 						totalAnalysisFlows++
 						if detected {
 							detectedAnalysisFlows++
-							if cAlerts != nil && cAlerts[escRound] != nil && (len(cAlerts[escRound][flow.Category]) > 0 || len(cAlerts[escRound]["generic"]) > 0) {
+							if cAlertsAnalysis != nil && cAlertsAnalysis[escRound] != nil && (len(cAlertsAnalysis[escRound][flow.Category]) > 0 || len(cAlertsAnalysis[escRound]["generic"]) > 0) {
 								var tCorrobs []int
 								if len(tAlerts[escRound][flow.Category]) > 0 {
 									tCorrobs = tAlerts[escRound][flow.Category]
@@ -172,10 +172,10 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 									tCorrobs = tAlerts[escRound]["generic"]
 								}
 								var cCorrobs []int
-								if len(cAlerts[escRound][flow.Category]) > 0 {
-									cCorrobs = cAlerts[escRound][flow.Category]
+								if len(cAlertsAnalysis[escRound][flow.Category]) > 0 {
+									cCorrobs = cAlertsAnalysis[escRound][flow.Category]
 								} else {
-									cCorrobs = cAlerts[escRound]["generic"]
+									cCorrobs = cAlertsAnalysis[escRound]["generic"]
 								}
 								if equalSlices(tCorrobs, cCorrobs) {
 									// Just reuse ExactMatches/NoiseCoincidences
@@ -193,7 +193,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 		}
 	}
 
-	if (detectedReconFlows > 0 || detectedDosFlows > 0 || detectedAnalysisFlows > 0) && cAlerts != nil {
+	if (detectedReconFlows > 0 || detectedDosFlows > 0 || detectedAnalysisFlows > 0) && cAlertsRecon != nil {
 		fmt.Printf("DEBUG: DetectedRecon=%d/%d, CorrectedRecon=%d/%d, CorrectedDoS=%d/%d, CorrectedAnalysis=%d/%d, ExactMatches=%d, NoiseCoincidences=%d\n", 
 			detectedReconFlows, totalReconFlows, correctedDetectedReconFlows, totalReconFlows, correctedDetectedDosFlows, totalDosFlows, correctedDetectedAnalysisFlows, totalAnalysisFlows, totalExactMatches, totalNoiseCoincidences)
 	}
@@ -228,6 +228,14 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	totalAnalysisNormalWindows := 0
 	falsePosAnalysisWindows := 0
 
+	pureIdleWindows := 0
+	cReconAlertsPure := 0
+	tReconAlertsPure := 0
+	cDoSAlertsPure := 0
+	tDoSAlertsPure := 0
+	cAnalysisAlertsPure := 0
+	tAnalysisAlertsPure := 0
+
 	for r := 1; r <= maxRound; r++ {
 		hasReconFlow := false
 		hasDoSFlow := false
@@ -247,6 +255,30 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 			}
 		}
 		
+		if !hasReconFlow && !hasDoSFlow && !hasAnalysisFlow {
+			pureIdleWindows++
+			if tAlerts[r] != nil && len(tAlerts[r]["reconnaissance"]) > 0 {
+				tReconAlertsPure++
+			}
+			if cAlertsRecon != nil && cAlertsRecon[r] != nil && len(cAlertsRecon[r]["reconnaissance"]) > 0 {
+				cReconAlertsPure++
+			}
+
+			if tAlerts[r] != nil && len(tAlerts[r]["dos"]) > 0 {
+				tDoSAlertsPure++
+			}
+			if cAlertsDoS != nil && cAlertsDoS[r] != nil && len(cAlertsDoS[r]["dos"]) > 0 {
+				cDoSAlertsPure++
+			}
+
+			if tAlerts[r] != nil && (len(tAlerts[r]["analysis"]) > 0 || len(tAlerts[r]["generic"]) > 0) {
+				tAnalysisAlertsPure++
+			}
+			if cAlertsAnalysis != nil && cAlertsAnalysis[r] != nil && (len(cAlertsAnalysis[r]["analysis"]) > 0 || len(cAlertsAnalysis[r]["generic"]) > 0) {
+				cAnalysisAlertsPure++
+			}
+		}
+
 		if hasReconFlow {
 			totalReconActiveWindows++
 			if tAlerts[r] != nil && len(tAlerts[r]["reconnaissance"]) > 0 {
@@ -254,7 +286,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 			}
 		} else {
 			totalReconNormalWindows++
-			if tAlerts[r] != nil && len(tAlerts[r]["reconnaissance"]) > 0 {
+			if cAlertsRecon != nil && cAlertsRecon[r] != nil && len(cAlertsRecon[r]["reconnaissance"]) > 0 {
 				falsePosReconWindows++
 			}
 		}
@@ -266,7 +298,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 			}
 		} else {
 			totalDoSNormalWindows++
-			if tAlerts[r] != nil && len(tAlerts[r]["dos"]) > 0 {
+			if cAlertsDoS != nil && cAlertsDoS[r] != nil && len(cAlertsDoS[r]["dos"]) > 0 {
 				falsePosDoSWindows++
 			}
 		}
@@ -278,7 +310,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 			}
 		} else {
 			totalAnalysisNormalWindows++
-			if tAlerts[r] != nil && (len(tAlerts[r]["analysis"]) > 0 || len(tAlerts[r]["generic"]) > 0) {
+			if cAlertsAnalysis != nil && cAlertsAnalysis[r] != nil && (len(cAlertsAnalysis[r]["analysis"]) > 0 || len(cAlertsAnalysis[r]["generic"]) > 0) {
 				falsePosAnalysisWindows++
 			}
 		}
@@ -306,9 +338,13 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 		analysisFPR = float64(falsePosAnalysisWindows) / float64(totalAnalysisNormalWindows)
 	}
 
-	if (totalAnalysisActiveWindows > 0 || totalAnalysisNormalWindows > 0) && cAlerts != nil {
+	if (totalAnalysisActiveWindows > 0 || totalAnalysisNormalWindows > 0) && cAlertsRecon != nil {
 		fmt.Printf("DEBUG_ANALYSIS_FPR: FPR=%f (%d/%d), TPR=%d/%d\n", 
 			analysisFPR, falsePosAnalysisWindows, totalAnalysisNormalWindows, truePosAnalysisWindows, totalAnalysisActiveWindows)
+		fmt.Printf("DEBUG_PURE_IDLE_FPR:\n")
+		fmt.Printf("  Recon Control FPR=%f (%d/%d), Treatment FPR=%f (%d/%d)\n", float64(cReconAlertsPure)/float64(pureIdleWindows), cReconAlertsPure, pureIdleWindows, float64(tReconAlertsPure)/float64(pureIdleWindows), tReconAlertsPure, pureIdleWindows)
+		fmt.Printf("  DoS Control FPR=%f (%d/%d), Treatment FPR=%f (%d/%d)\n", float64(cDoSAlertsPure)/float64(pureIdleWindows), cDoSAlertsPure, pureIdleWindows, float64(tDoSAlertsPure)/float64(pureIdleWindows), tDoSAlertsPure, pureIdleWindows)
+		fmt.Printf("  Analysis Control FPR=%f (%d/%d), Treatment FPR=%f (%d/%d)\n", float64(cAnalysisAlertsPure)/float64(pureIdleWindows), cAnalysisAlertsPure, pureIdleWindows, float64(tAnalysisAlertsPure)/float64(pureIdleWindows), tAnalysisAlertsPure, pureIdleWindows)
 	}
 
 	var avgLatency float64

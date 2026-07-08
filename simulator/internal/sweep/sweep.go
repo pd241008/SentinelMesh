@@ -103,7 +103,9 @@ func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64,
 	for _, N := range cfg.Sweep.N {
 		for _, k := range cfg.Sweep.K {
 			tPartitions, tCampaigns := fragment.DistributeFlows(allFlows, N, k, AttackCategories, clustered, staggerRounds)
-			cPartitions, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, AttackCategories, clustered, staggerRounds)
+			cPartitionsRecon, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, []string{"reconnaissance"}, clustered, staggerRounds)
+			cPartitionsDoS, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, []string{"dos"}, clustered, staggerRounds)
+			cPartitionsAnalysis, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, []string{"analysis"}, clustered, staggerRounds)
 
 			totalRounds := 0
 			for _, p := range tPartitions {
@@ -130,10 +132,16 @@ func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64,
 					gossipNodesT := makeNodes(N, tPartitions, alpha, cfg.Sweep.W, thresh)
 					gResultT := runGossip(gossipNodesT, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
 
-					gossipNodesC := makeNodes(N, cPartitions, alpha, cfg.Sweep.W, thresh)
-					gResultC := runGossip(gossipNodesC, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
+					gossipNodesCRecon := makeNodes(N, cPartitionsRecon, alpha, cfg.Sweep.W, thresh)
+					gResultCRecon := runGossip(gossipNodesCRecon, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
+					
+					gossipNodesCDoS := makeNodes(N, cPartitionsDoS, alpha, cfg.Sweep.W, thresh)
+					gResultCDoS := runGossip(gossipNodesCDoS, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
+					
+					gossipNodesCAnalysis := makeNodes(N, cPartitionsAnalysis, alpha, cfg.Sweep.W, thresh)
+					gResultCAnalysis := runGossip(gossipNodesCAnalysis, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
 
-					gMetrics := metrics.Compute(gossipNodesT, allFlows, gResultT.alerts, gResultC.alerts, gResultT.totalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
+					gMetrics := metrics.Compute(gossipNodesT, allFlows, gResultT.alerts, gResultCRecon.alerts, gResultCDoS.alerts, gResultCAnalysis.alerts, gResultT.totalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
 					
 					result.GossipFlowReconRecall = gMetrics.FlowReconRecall
 					result.GossipFlowDoSRecall = gMetrics.FlowDoSRecall
@@ -149,7 +157,7 @@ func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64,
 					// Baseline independent doesn't strictly need counterfactual as it's structurally the same, but we use tResult for consistency
 					indepNodes := makeNodes(N, tPartitions, alpha, cfg.Sweep.W, thresh)
 					iResult := baseline.RunIndependent(indepNodes, cfg.Sweep.W, totalRounds, q)
-					iMetrics := metrics.Compute(indepNodes, allFlows, iResult.Alerts, nil, iResult.TotalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
+					iMetrics := metrics.Compute(indepNodes, allFlows, iResult.Alerts, nil, nil, nil, iResult.TotalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
 					result.IndepFlowReconRecall = iMetrics.FlowReconRecall
 					result.IndepFlowDoSRecall = iMetrics.FlowDoSRecall
 					result.IndepWindowReconRecall = iMetrics.WindowReconRecall
@@ -161,7 +169,7 @@ func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64,
 
 					centNodes := makeNodes(N, tPartitions, alpha, cfg.Sweep.W, thresh)
 					cResult := baseline.RunCentralized(centNodes, cfg.Sweep.W, totalRounds, q)
-					cMetrics := metrics.Compute(centNodes, allFlows, cResult.Alerts, nil, cResult.TotalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
+					cMetrics := metrics.Compute(centNodes, allFlows, cResult.Alerts, nil, nil, nil, cResult.TotalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
 					result.CentFlowReconRecall = cMetrics.FlowReconRecall
 					result.CentFlowDoSRecall = cMetrics.FlowDoSRecall
 					result.CentWindowReconRecall = cMetrics.WindowReconRecall

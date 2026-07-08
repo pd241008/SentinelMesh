@@ -63,7 +63,7 @@ def run_synthetic_harness():
                             else:
                                 background_corrobs = set()
                                 
-                            # Replacement Corrobs (from N nodes now, due to fix)
+                            # Replacement Corrobs (ONLY generated during attacks, used for per-flow comparison)
                             if random.random() < p_noise:
                                 m_r = random.randint(q, k) if q <= k else k
                                 replacement_corrobs = sample_correlated(range(N), background_corrobs, m_r, c)
@@ -99,12 +99,24 @@ def run_synthetic_harness():
                                     if not (c_detected and overlap >= 0.7): rule_retained["Overlap-0.7"] += 1
                                     if not (c_detected and overlap >= 0.9): rule_retained["Overlap-0.9"] += 1
                                     if not (c_detected and overlap >= 0.95): rule_retained["Overlap-0.95"] += 1
-                            if c_detected:
-                                c_detections += 1
+                                    
+                        # TN Simulation for p_hat (Control FPR)
+                        # In isolated-category MCC, Control experiences NO replacement injection during True Negative windows.
+                        # Thus, Control FPR (p_hat) is purely the ambient background noise rate crossing threshold q.
+                        tn_windows = 1000
+                        tn_c_detections = 0
+                        for _ in range(tn_windows):
+                            if random.random() < p_noise:
+                                m_b = random.randint(q, N) if q <= N else N
+                                background_corrobs = set(random.sample(range(N), m_b))
+                            else:
+                                background_corrobs = set()
+                            if len(background_corrobs) >= q:
+                                tn_c_detections += 1
                                 
-                        # Population Correction (Computed per seed)
-                        p_hat = c_detections / float(num_flows)
+                        p_hat = tn_c_detections / float(tn_windows)
                         obs_rate = t_detections / float(num_flows)
+                        
                         if p_hat < 1.0:
                             pop_recall = (obs_rate - p_hat) / (1.0 - p_hat)
                         else:
