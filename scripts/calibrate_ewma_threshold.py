@@ -41,7 +41,7 @@ class GoMatchingEWMAScorer(GoEWMAScorer):
 
 
 def main():
-    data_path = "/root/workspace/workspace/03-Code/Projects/Legacy/SentinalMesh/data/raw/UNSW_NB15_training-set.csv"
+    data_path = "/root/workspace/workspace/03-Code/Projects/Legacy/centralized_datasets/raw/unsw_nb15/UNSW_NB15_training-set.csv"
     print(f"Loading training data from {data_path}...")
     ds = FlowDataset.load_csv(data_path)
     print(f"  Total flows: {len(ds)}")
