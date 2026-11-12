@@ -27,7 +27,7 @@ func main() {
 	}
 
 	tPartitions, _ := fragment.DistributeFlows(allFlows, 32, 8, attackCategories, false, 2)
-	cPartitions, _ := fragment.DistributeFlowsControl(allFlows, normalPool, 32, 8, attackCategories, false, 2)
+	cPartitions, _ := fragment.DistributeFlowsControl(allFlows, normalPool, 32, 8, attackCategories, "reconnaissance", false, 2)
 
 	mismatchFound := false
 	for n := 0; n < 32; n++ {

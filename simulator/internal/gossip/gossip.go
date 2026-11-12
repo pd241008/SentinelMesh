@@ -28,7 +28,7 @@ func (g *Gossiper) Round(round int) {
 	for _, sender := range g.nodes {
 		// UNCONDITIONALLY advance RNG state so Treatment and Control remain synchronized
 		indices := g.rng.Perm(len(g.nodes))
-		
+
 		digest, ok := sender.ProcessFlowsForRound(round)
 		if !ok || digest == nil {
 			continue
@@ -56,8 +56,6 @@ func (g *Gossiper) selectPeersFromIndices(senderID int, indices []int) []*node.N
 	}
 	return selected
 }
-
-
 
 func (g *Gossiper) evictStale(round int) {
 	for _, n := range g.nodes {

@@ -12,20 +12,20 @@ import (
 )
 
 type Result struct {
-	FlowReconRecall   float64
-	FlowDoSRecall     float64
-	CorrectedFlowReconRecall float64
-	CorrectedFlowDoSRecall   float64
-	BernoulliFlowReconRecall float64
-	BernoulliFlowDoSRecall   float64
+	FlowReconRecall             float64
+	FlowDoSRecall               float64
+	CorrectedFlowReconRecall    float64
+	CorrectedFlowDoSRecall      float64
+	BernoulliFlowReconRecall    float64
+	BernoulliFlowDoSRecall      float64
 	BernoulliFlowAnalysisRecall float64
-	WindowReconRecall float64
-	WindowDoSRecall   float64
-	ReconFPR          float64
-	DoSFPR            float64
-	AnalysisFPR       float64
-	BandwidthKBps     float64
-	AvgLatency        float64
+	WindowReconRecall           float64
+	WindowDoSRecall             float64
+	ReconFPR                    float64
+	DoSFPR                      float64
+	AnalysisFPR                 float64
+	BandwidthKBps               float64
+	AvgLatency                  float64
 }
 
 func min(a, b int) int {
@@ -127,7 +127,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 							}
 						}
 					}
-					
+
 					if flow.Category == "reconnaissance" {
 						totalReconFlows++
 						if detected {
@@ -198,7 +198,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	}
 
 	if (detectedReconFlows > 0 || detectedDosFlows > 0 || detectedAnalysisFlows > 0) && cAlertsRecon != nil {
-		fmt.Printf("DEBUG: DetectedRecon=%d/%d, CorrectedRecon=%d/%d, CorrectedDoS=%d/%d, CorrectedAnalysis=%d/%d, ExactMatches=%d, NoiseCoincidences=%d\n", 
+		fmt.Printf("DEBUG: DetectedRecon=%d/%d, CorrectedRecon=%d/%d, CorrectedDoS=%d/%d, CorrectedAnalysis=%d/%d, ExactMatches=%d, NoiseCoincidences=%d\n",
 			detectedReconFlows, totalReconFlows, correctedDetectedReconFlows, totalReconFlows, correctedDetectedDosFlows, totalDosFlows, correctedDetectedAnalysisFlows, totalAnalysisFlows, totalExactMatches, totalNoiseCoincidences)
 	}
 
@@ -208,7 +208,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 		flowReconRecall = float64(detectedReconFlows) / float64(totalReconFlows)
 		correctedFlowReconRecall = float64(correctedDetectedReconFlows) / float64(totalReconFlows)
 	}
-	
+
 	var flowDosRecall float64
 	var correctedFlowDosRecall float64
 	if totalDosFlows > 0 {
@@ -284,7 +284,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 				}
 			}
 		}
-		
+
 		if !hasReconFlow && !hasDoSFlow && !hasAnalysisFlow {
 			pureIdleWindows++
 			if tAlerts[r] != nil && len(tAlerts[r]["reconnaissance"]) > 0 {
@@ -356,7 +356,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 				falsePosReconWindows++
 			}
 		}
-		
+
 		if hasDoSFlow {
 			totalDoSActiveWindows++
 			if tAlerts[r] != nil && len(tAlerts[r]["dos"]) > 0 {
@@ -381,7 +381,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 			}
 		}
 	}
-	
+
 	var windowReconRecall float64
 	if totalReconActiveWindows > 0 {
 		windowReconRecall = float64(truePosReconWindows) / float64(totalReconActiveWindows)
@@ -405,7 +405,7 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	}
 
 	if (totalAnalysisActiveWindows > 0 || totalAnalysisNormalWindows > 0) && cAlertsRecon != nil {
-		fmt.Printf("DEBUG_ANALYSIS_FPR: FPR=%f (%d/%d), TPR=%d/%d\n", 
+		fmt.Printf("DEBUG_ANALYSIS_FPR: FPR=%f (%d/%d), TPR=%d/%d\n",
 			analysisFPR, falsePosAnalysisWindows, totalAnalysisNormalWindows, truePosAnalysisWindows, totalAnalysisActiveWindows)
 		fmt.Printf("DEBUG_PURE_IDLE_FPR:\n")
 		fmt.Printf("  Recon Control FPR=%f (%d/%d), Treatment FPR=%f (%d/%d)\n", float64(cReconAlertsPure)/float64(pureIdleWindows), cReconAlertsPure, pureIdleWindows, float64(tReconAlertsPure)/float64(pureIdleWindows), tReconAlertsPure, pureIdleWindows)
@@ -452,19 +452,19 @@ func Compute(nodes []*node.Node, allFlows []dataset.Flow, tAlerts baseline.Alert
 	}
 
 	return Result{
-		FlowReconRecall:   math.Round(flowReconRecall*10000) / 10000,
-		FlowDoSRecall:     math.Round(flowDosRecall*10000) / 10000,
-		CorrectedFlowReconRecall: math.Round(correctedFlowReconRecall*10000) / 10000,
-		CorrectedFlowDoSRecall:   math.Round(correctedFlowDosRecall*10000) / 10000,
-		BernoulliFlowReconRecall: math.Round(bernoulliRecon*10000) / 10000,
-		BernoulliFlowDoSRecall:   math.Round(bernoulliDoS*10000) / 10000,
+		FlowReconRecall:             math.Round(flowReconRecall*10000) / 10000,
+		FlowDoSRecall:               math.Round(flowDosRecall*10000) / 10000,
+		CorrectedFlowReconRecall:    math.Round(correctedFlowReconRecall*10000) / 10000,
+		CorrectedFlowDoSRecall:      math.Round(correctedFlowDosRecall*10000) / 10000,
+		BernoulliFlowReconRecall:    math.Round(bernoulliRecon*10000) / 10000,
+		BernoulliFlowDoSRecall:      math.Round(bernoulliDoS*10000) / 10000,
 		BernoulliFlowAnalysisRecall: math.Round(bernoulliAnalysis*10000) / 10000,
-		WindowReconRecall: math.Round(windowReconRecall*10000) / 10000,
-		WindowDoSRecall:   math.Round(windowDosRecall*10000) / 10000,
-		ReconFPR:          math.Round(reconFPR*10000) / 10000,
-		DoSFPR:            math.Round(dosFPR*10000) / 10000,
-		AnalysisFPR:       math.Round(analysisFPR*10000) / 10000,
-		BandwidthKBps:     bandwidthKBps,
-		AvgLatency:        math.Round(avgLatency*100) / 100,
+		WindowReconRecall:           math.Round(windowReconRecall*10000) / 10000,
+		WindowDoSRecall:             math.Round(windowDosRecall*10000) / 10000,
+		ReconFPR:                    math.Round(reconFPR*10000) / 10000,
+		DoSFPR:                      math.Round(dosFPR*10000) / 10000,
+		AnalysisFPR:                 math.Round(analysisFPR*10000) / 10000,
+		BandwidthKBps:               bandwidthKBps,
+		AvgLatency:                  math.Round(avgLatency*100) / 100,
 	}
 }

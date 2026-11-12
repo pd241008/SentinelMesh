@@ -26,14 +26,15 @@ func main() {
 	}
 
 	tPartitions, _ := fragment.DistributeFlows(allFlows, 32, 8, attackCategories, false, 0)
-	cPartitions, _ := fragment.DistributeFlowsControl(allFlows, normalPool, 32, 8, attackCategories, false, 0)
+	cPartitions, _ := fragment.DistributeFlowsControl(allFlows, normalPool, 32, 8, attackCategories, "reconnaissance", false, 0)
 
 	// Pick 20 untouched Normal flows from the dataset (they have IsAttack == false and cat == "normal")
 	var sampleFlows []dataset.Flow
 	for _, f := range allFlows {
 		if strings.ToLower(f.Category) == "normal" {
 			sampleFlows = append(sampleFlows, f)
-			if len(sampleFlows) == 10020 { sampleFlows = sampleFlows[10000:]; break 
+			if len(sampleFlows) == 10020 {
+				sampleFlows = sampleFlows[10000:]
 				break
 			}
 		}
@@ -46,7 +47,7 @@ func main() {
 	for _, sf := range sampleFlows {
 		tNode, tRound := findFlow(tPartitions, sf.ID)
 		cNode, cRound := findFlow(cPartitions, sf.ID)
-		
+
 		diff := tRound - cRound
 
 		fmt.Printf("%-8d | %-15d | %-15d | %-15d | %-15d | %+10d\n", sf.ID, tNode, cNode, tRound, cRound, diff)
