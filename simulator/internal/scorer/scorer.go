@@ -30,13 +30,13 @@ func (f *FeatureEWMA) update(val float64) float64 {
 	}
 
 	diff := val - f.mean
-	
+
 	// Fix: EWMA Contamination. Only update baseline if the observation looks "normal"
 	// Changed threshold from 2.5 to 15.0 after applying log1p scaling (covers ~99% of normal traffic)
 	// Must also update if variance is low, otherwise it gets permanently stuck at z=huge
 	if math.Abs(z) < 15.0 || f.variance < 0.1 {
 		f.mean += f.alpha * diff
-		f.variance = (1-f.alpha)*(f.variance + f.alpha*diff*diff)
+		f.variance = (1 - f.alpha) * (f.variance + f.alpha*diff*diff)
 	}
 	f.count++
 
@@ -69,7 +69,11 @@ func New(alpha float64, thresholds Thresholds) *Scorer {
 	}
 }
 
-func (s *Scorer) ScoreFlow(flow dataset.Flow) (float64, string, bool) {
+// ScoreFlow evaluates a flow against all three category detectors and returns
+// every category whose normalized score breaches its threshold (the paper's
+// C_i(t) multi-category set), plus the single highest-scoring category for
+// backward-compatible digest emission.
+func (s *Scorer) ScoreFlow(flow dataset.Flow) (float64, []string, string, bool) {
 	// 1. EWMA Z-Score (Generic)
 	zSbytes := s.features["Sbytes"].update(math.Log1p(float64(flow.Sbytes)))
 	zDbytes := s.features["Dbytes"].update(math.Log1p(float64(flow.Dbytes)))
@@ -78,59 +82,78 @@ func (s *Scorer) ScoreFlow(flow dataset.Flow) (float64, string, bool) {
 	zRate := s.features["Rate"].update(math.Log1p(flow.Rate))
 
 	ewmaScore := zSbytes
-	if zDbytes > ewmaScore { ewmaScore = zDbytes }
-	if zSpkts > ewmaScore { ewmaScore = zSpkts }
-	if zDpkts > ewmaScore { ewmaScore = zDpkts }
-	if zRate > ewmaScore { ewmaScore = zRate }
+	if zDbytes > ewmaScore {
+		ewmaScore = zDbytes
+	}
+	if zSpkts > ewmaScore {
+		ewmaScore = zSpkts
+	}
+	if zDpkts > ewmaScore {
+		ewmaScore = zDpkts
+	}
+	if zRate > ewmaScore {
+		ewmaScore = zRate
+	}
 	ewmaScore = ewmaScore / 5.0 // Normalize a bit to roughly [0, 3+]
 
 	// 2. Absolute Magnitude (DoS)
-	dosScore := math.Log1p(flow.Rate)/14.0
-	if v := math.Log1p(float64(flow.Sbytes))/21.0; v > dosScore { dosScore = v }
-	if v := math.Log1p(float64(flow.Dbytes))/21.0; v > dosScore { dosScore = v }
-	if v := math.Log1p(float64(flow.Spkts))/14.0; v > dosScore { dosScore = v }
-	if v := math.Log1p(float64(flow.Dpkts))/14.0; v > dosScore { dosScore = v }
+	dosScore := math.Log1p(flow.Rate) / 14.0
+	if v := math.Log1p(float64(flow.Sbytes)) / 21.0; v > dosScore {
+		dosScore = v
+	}
+	if v := math.Log1p(float64(flow.Dbytes)) / 21.0; v > dosScore {
+		dosScore = v
+	}
+	if v := math.Log1p(float64(flow.Spkts)) / 14.0; v > dosScore {
+		dosScore = v
+	}
+	if v := math.Log1p(float64(flow.Dpkts)) / 14.0; v > dosScore {
+		dosScore = v
+	}
 
 	// 3. Inverse Fan-Out (Recon)
 	fanoutDst := float64(flow.CtDstLtm) / (float64(flow.CtDstSportLtm) + 1.0)
 	reconScore := 1.0 / (fanoutDst + 0.1)
 
-	// Threshold gating with priority-based tie-breaker.
-	// DoS and Recon are the paper's measured categories and take priority.
-	// EWMA/generic is a fallback for residual anomalies — it should never
-	// steal a classification from a specific detector that also fired.
+	// Threshold gating — collect every category whose normalized score
+	// breaches its threshold (the paper's C_i(t) multi-category set).
 	dosMargin := dosScore / s.thresholds.DoS
 	reconMargin := reconScore / s.thresholds.Recon
+	ewmaMargin := ewmaScore / s.thresholds.Ewma
 
-	maxMargin := 1.0 // strictly greater than 1.0 means it breached
+	var categories []string
+	primaryCategory := "normal"
+	primaryScore := 0.0
 	isAnomalous := false
-	guessedCategory := "normal"
-	finalScore := ewmaScore
 
-	// Priority 1: DoS and Recon (paper's measured categories)
-	if dosMargin > maxMargin {
-		maxMargin = dosMargin
-		guessedCategory = "dos"
+	if dosMargin > 1.0 {
+		categories = append(categories, "dos")
 		isAnomalous = true
-		finalScore = dosScore
+		if dosScore > primaryScore {
+			primaryScore = dosScore
+			primaryCategory = "dos"
+		}
 	}
-	if reconMargin > maxMargin {
-		maxMargin = reconMargin
-		guessedCategory = "reconnaissance"
+	if reconMargin > 1.0 {
+		categories = append(categories, "reconnaissance")
 		isAnomalous = true
-		finalScore = reconScore
+		if reconScore > primaryScore {
+			primaryScore = reconScore
+			primaryCategory = "reconnaissance"
+		}
 	}
-
-	// Priority 2: EWMA/generic — only if no specific detector fired
-	if !isAnomalous {
-		ewmaMargin := ewmaScore / s.thresholds.Ewma
-		if ewmaMargin > 1.0 {
-			guessedCategory = "generic"
-			isAnomalous = true
-			finalScore = ewmaScore
+	if ewmaMargin > 1.0 {
+		categories = append(categories, "generic")
+		isAnomalous = true
+		if ewmaScore > primaryScore {
+			primaryScore = ewmaScore
+			primaryCategory = "generic"
 		}
 	}
 
-	return finalScore, guessedCategory, isAnomalous
-}
+	if !isAnomalous {
+		return ewmaScore, nil, "normal", false
+	}
 
+	return primaryScore, categories, primaryCategory, true
+}
