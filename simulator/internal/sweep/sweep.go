@@ -26,10 +26,10 @@ var AttackCategories = []string{
 
 type Config struct {
 	Sweep struct {
-		N []int `yaml:"N"`
-		F []int `yaml:"f"`
-		K []int `yaml:"k"`
-		W int   `yaml:"W"`
+		N          []int `yaml:"N"`
+		F          []int `yaml:"f"`
+		K          []int `yaml:"k"`
+		W          int   `yaml:"W"`
 		Thresholds struct {
 			Recon float64 `yaml:"threshold_recon"`
 			DoS   float64 `yaml:"threshold_dos"`
@@ -39,41 +39,41 @@ type Config struct {
 }
 
 type RunResult struct {
-	N              int
-	F              int
-	Q              int
-	K              int
-	W              int
-	GossipFlowReconRecall   float64
-	GossipFlowDoSRecall     float64
-	GossipCorrectedFlowReconRecall float64
-	GossipCorrectedFlowDoSRecall   float64
-	GossipBernoulliFlowReconRecall float64
-	GossipBernoulliFlowDoSRecall   float64
+	N                                 int
+	F                                 int
+	Q                                 int
+	K                                 int
+	W                                 int
+	GossipFlowReconRecall             float64
+	GossipFlowDoSRecall               float64
+	GossipCorrectedFlowReconRecall    float64
+	GossipCorrectedFlowDoSRecall      float64
+	GossipBernoulliFlowReconRecall    float64
+	GossipBernoulliFlowDoSRecall      float64
 	GossipBernoulliFlowAnalysisRecall float64
-	GossipWindowReconRecall float64
-	GossipWindowDoSRecall   float64
-	GossipReconFPR          float64
-	GossipDoSFPR            float64
-	GossipAnalysisFPR       float64
-	GossipBandwidth         float64
-	GossipLatency           float64
-	IndepFlowReconRecall    float64
-	IndepFlowDoSRecall      float64
-	IndepWindowReconRecall  float64
-	IndepWindowDoSRecall    float64
-	IndepReconFPR           float64
-	IndepDoSFPR             float64
-	IndepBandwidth          float64
-	IndepLatency            float64
-	CentFlowReconRecall     float64
-	CentFlowDoSRecall       float64
-	CentWindowReconRecall   float64
-	CentWindowDoSRecall     float64
-	CentReconFPR            float64
-	CentDoSFPR              float64
-	CentBandwidth           float64
-	CentLatency             float64
+	GossipWindowReconRecall           float64
+	GossipWindowDoSRecall             float64
+	GossipReconFPR                    float64
+	GossipDoSFPR                      float64
+	GossipAnalysisFPR                 float64
+	GossipBandwidth                   float64
+	GossipLatency                     float64
+	IndepFlowReconRecall              float64
+	IndepFlowDoSRecall                float64
+	IndepWindowReconRecall            float64
+	IndepWindowDoSRecall              float64
+	IndepReconFPR                     float64
+	IndepDoSFPR                       float64
+	IndepBandwidth                    float64
+	IndepLatency                      float64
+	CentFlowReconRecall               float64
+	CentFlowDoSRecall                 float64
+	CentWindowReconRecall             float64
+	CentWindowDoSRecall               float64
+	CentReconFPR                      float64
+	CentDoSFPR                        float64
+	CentBandwidth                     float64
+	CentLatency                       float64
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -136,17 +136,17 @@ func Run(cfg *Config, allFlows []dataset.Flow, alpha float64, threshold float64,
 					cPartitionsRecon, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, AttackCategories, "reconnaissance", clustered, staggerRounds)
 					gossipNodesCRecon := makeNodes(N, cPartitionsRecon, alpha, cfg.Sweep.W, thresh)
 					gResultCRecon := runGossip(gossipNodesCRecon, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
-					
+
 					cPartitionsDoS, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, AttackCategories, "dos", clustered, staggerRounds)
 					gossipNodesCDoS := makeNodes(N, cPartitionsDoS, alpha, cfg.Sweep.W, thresh)
 					gResultCDoS := runGossip(gossipNodesCDoS, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
-					
+
 					cPartitionsAnalysis, _ := fragment.DistributeFlowsControl(allFlows, normalPool, N, k, AttackCategories, "analysis", clustered, staggerRounds)
 					gossipNodesCAnalysis := makeNodes(N, cPartitionsAnalysis, alpha, cfg.Sweep.W, thresh)
 					gResultCAnalysis := runGossip(gossipNodesCAnalysis, f, cfg.Sweep.W, q, totalRounds, seed+idx, coldStart)
 
 					gMetrics := metrics.Compute(gossipNodesT, allFlows, gResultT.alerts, gResultCRecon.alerts, gResultCDoS.alerts, gResultCAnalysis.alerts, gResultT.totalDigests, cfg.Sweep.W, tCampaigns, totalRounds, N)
-					
+
 					result.GossipFlowReconRecall = gMetrics.FlowReconRecall
 					result.GossipFlowDoSRecall = gMetrics.FlowDoSRecall
 					result.GossipCorrectedFlowReconRecall = gMetrics.CorrectedFlowReconRecall
@@ -205,8 +205,8 @@ func computeQRange(k int) []int {
 }
 
 type gossipResult struct {
-	alerts        baseline.AlertTimeline
-	totalDigests  int
+	alerts       baseline.AlertTimeline
+	totalDigests int
 }
 
 func runGossip(nodes []*node.Node, f, w int, q int, rounds int, seed int64, coldStart bool) gossipResult {
@@ -219,7 +219,7 @@ func runGossip(nodes []*node.Node, f, w int, q int, rounds int, seed int64, cold
 			for r, f := range n.Flows {
 				if f.IsAttack {
 					if firstAttackRound == -1 || r+1 < firstAttackRound {
-						firstAttackRound = r+1
+						firstAttackRound = r + 1
 					}
 					break
 				}
@@ -236,7 +236,7 @@ func runGossip(nodes []*node.Node, f, w int, q int, rounds int, seed int64, cold
 		g.Round(round)
 
 		for _, n := range nodes {
-			for cat, corrobs := range quorum.Evaluate(n.GetCache(), q, w, round) {
+			for cat, corrobs := range quorum.Evaluate(n.GetCache(), q, w, round, nil) {
 				if alerts[round] == nil {
 					alerts[round] = make(map[string][]int)
 				}

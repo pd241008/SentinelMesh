@@ -1,0 +1,20 @@
+{
+  "name": "sentinelmesh",
+  "version": "0.1.0",
+  "description": "Lean 4 formalization of SentinelMesh theorems",
+  "license": "MIT",
+  "leanVersion": "4.15.0",
+  "dependencies": [
+    {
+      "name": "mathlib",
+      "git": "https://github.com/leanprover-community/mathlib4.git",
+      "rev": "v4.15.0"
+    }
+  ],
+  "library": [
+    {
+      "name": "SentinelMesh",
+      "src": "SentinelMesh"
+    }
+  ]
+}

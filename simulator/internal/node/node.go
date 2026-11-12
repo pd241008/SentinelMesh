@@ -1,15 +1,21 @@
 package node
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/binary"
+
 	"github.com/pd241008/sentinelmesh/simulator/internal/dataset"
 	"github.com/pd241008/sentinelmesh/simulator/internal/scorer"
 )
 
 type Digest struct {
-	NodeID   int
-	Score    float64
-	Category string
-	Round    int // Discrete gossip round at which this digest was generated
+	NodeID     int
+	Score      float64
+	Category   string   // Primary (highest-scoring) category for backward compatibility
+	Categories []string // All breached categories (paper's C_i(t) multi-category set)
+	Round      int      // Discrete gossip round at which this digest was generated
+	Signature  []byte   // 16-byte truncated HMAC-SHA256 origin signature
 }
 
 type Node struct {
@@ -19,6 +25,7 @@ type Node struct {
 	DigestCache map[int][]Digest // PeerNodeID -> list of Digests within W
 	CurrentFlow int
 	Window      int
+	signingKey  []byte
 }
 
 func New(id int, flows []dataset.Flow, alpha float64, thresh scorer.Thresholds, window int) *Node {
@@ -28,6 +35,7 @@ func New(id int, flows []dataset.Flow, alpha float64, thresh scorer.Thresholds, 
 		Flows:       flows,
 		DigestCache: make(map[int][]Digest),
 		Window:      window,
+		signingKey:  make([]byte, 16),
 	}
 }
 
@@ -39,7 +47,7 @@ func (n *Node) ProcessFlowsForRound(round int) (*Digest, bool) {
 	flow := n.Flows[n.CurrentFlow]
 	n.CurrentFlow++
 
-	score, guessedCategory, isAnomalous := n.Scorer.ScoreFlow(flow)
+	score, categories, primaryCategory, isAnomalous := n.Scorer.ScoreFlow(flow)
 
 	n.PurgeStale(round)
 
@@ -47,16 +55,48 @@ func (n *Node) ProcessFlowsForRound(round int) (*Digest, bool) {
 		return nil, true
 	}
 
+	// Construct 32-byte wire-format digest:
+	//   2B node_id | 2B category bitmask | 6B float16 score tuple | 6B timestamp | 16B HMAC-SHA256 tag
+	sig := n.signDigest(round, categories)
+
 	digest := Digest{
-		NodeID:   n.ID,
-		Score:    score,
-		Category: guessedCategory,
-		Round:    round,
+		NodeID:     n.ID,
+		Score:      score,
+		Category:   primaryCategory,
+		Categories: categories,
+		Round:      round,
+		Signature:  sig,
 	}
 
 	n.DigestCache[n.ID] = append(n.DigestCache[n.ID], digest)
 
 	return &digest, true
+}
+
+func (n *Node) signDigest(round int, categories []string) []byte {
+	mac := hmac.New(sha256.New, n.signingKey)
+	var buf [16]byte
+	binary.LittleEndian.PutUint16(buf[0:2], uint16(n.ID))
+	binary.LittleEndian.PutUint16(buf[2:4], categoryBitmask(categories))
+	binary.LittleEndian.PutUint64(buf[4:12], uint64(round))
+	mac.Write(buf[:12])
+	mac.Write([]byte{byte(round)})
+	return mac.Sum(nil)[:16]
+}
+
+func categoryBitmask(categories []string) uint16 {
+	var mask uint16
+	for _, c := range categories {
+		switch c {
+		case "dos":
+			mask |= 1 << 0
+		case "reconnaissance":
+			mask |= 1 << 1
+		case "generic":
+			mask |= 1 << 2
+		}
+	}
+	return mask
 }
 
 func (n *Node) ReceiveDigest(d Digest) {

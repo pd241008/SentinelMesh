@@ -1,0 +1,12 @@
+name = "sentinelmesh"
+version = "0.1.0"
+leanVersion = "4.15.0"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.15.0"
+
+[[lean_lib]]
+name = "SentinelMesh"
+src = "SentinelMesh"

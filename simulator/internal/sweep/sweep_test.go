@@ -47,7 +47,7 @@ func TestRun(t *testing.T) {
 	}
 
 	outputDir := t.TempDir()
-	if err := Run(cfg, allFlows, 0.3, 0.3, 99, outputDir); err != nil {
+	if err := Run(cfg, allFlows, 0.3, 0.3, 99, outputDir, false, false, 0); err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
 

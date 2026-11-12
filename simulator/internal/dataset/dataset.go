@@ -9,10 +9,10 @@ import (
 )
 
 type Flow struct {
-	ID        int
-	Timestamp float64
-	Category  string
-	IsAttack  bool
+	ID            int
+	Timestamp     float64
+	Category      string
+	IsAttack      bool
 	Sbytes        int
 	Dbytes        int
 	Spkts         int

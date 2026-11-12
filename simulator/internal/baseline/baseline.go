@@ -33,7 +33,7 @@ func RunIndependent(nodes []*node.Node, window int, totalRounds int, quorumThres
 			}
 		}
 		for _, n := range nodes {
-			for cat, corrobs := range quorum.Evaluate(n.GetCache(), 1, window, round) {
+			for cat, corrobs := range quorum.Evaluate(n.GetCache(), quorumThreshold, window, round, nil) {
 				addAlert(alerts, round, cat, corrobs)
 			}
 		}
@@ -57,7 +57,7 @@ func RunCentralized(nodes []*node.Node, window int, totalRounds int, quorumThres
 				totalDigests++
 			}
 		}
-		for cat, corrobs := range quorum.Evaluate(centralCache, quorumThreshold, window, round) {
+		for cat, corrobs := range quorum.Evaluate(centralCache, quorumThreshold, window, round, nil) {
 			addAlert(alerts, round, cat, corrobs)
 		}
 		for id, digests := range centralCache {

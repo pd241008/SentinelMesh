@@ -57,7 +57,7 @@ func distributeFlowsInternal(flows []dataset.Flow, normalPool []dataset.Flow, nu
 				actualK = numNodes
 			}
 			if clustered {
-				if rrCount % 5 != 0 {
+				if rrCount%5 != 0 {
 					assignedNode = 0
 				} else {
 					if actualK > 1 {
