@@ -27,3 +27,4 @@ dashboard/public/data/
 results/canonical_table/
 results/sweep_*/
 results/task*/
+lean/.lake/
